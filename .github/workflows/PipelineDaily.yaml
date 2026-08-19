@@ -41,6 +41,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nse-daily-quant-results-${{ github.run_number }}
-          path: nse_setups_daily_results_*.csv
+          path: |
+            nse_setups_daily_results_*.csv
+            Chartink_Screener_*.xlsx
           retention-days: 30
           if-no-files-found: warn
