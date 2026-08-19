@@ -28,6 +28,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
+from liquidity_rush import fetch_liquidity_rush, attach_liquidity_columns
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  ✏️  YOUR SCREENERS
 #  Format: ("Display Name", "clause", "your chartink scan clause here")
@@ -327,9 +329,28 @@ def fetch_chartink(session, scan_clause):
 # ══════════════════════════════════════════════════════════════════════════════
 #  BUILD EXCEL
 # ══════════════════════════════════════════════════════════════════════════════
-def build_excel(screener_results, output_path):
+def build_excel(screener_results, output_path, market="NSE"):
     wb = Workbook()
     wb.remove(wb.active)
+
+    # ── Liquidity Rush pre-pass ─────────────────────────────────────────────
+    # Collect every unique ticker across ALL screener sheets first, so each
+    # ticker's 10d/20d history is fetched from yfinance once — not once per
+    # sheet it happens to appear in.
+    all_syms = set()
+    for _, raw_df in screener_results:
+        if raw_df.empty:
+            continue
+        clean = filter_stocks_only(raw_df)
+        if clean.empty:
+            continue
+        tcol = "Ticker" if "Ticker" in clean.columns else clean.columns[0]
+        all_syms.update(clean[tcol].dropna().astype(str).str.strip().str.upper())
+
+    liquidity_metrics = {}
+    if all_syms:
+        print(f"   💧  Computing Liquidity Rush (10d/20d, {market}) for {len(all_syms)} unique ticker(s)...")
+        liquidity_metrics = fetch_liquidity_rush(all_syms, market=market)
 
     def fill(h):
         return PatternFill("solid", fgColor=h)
@@ -361,12 +382,27 @@ def build_excel(screener_results, output_path):
         ws = wb.create_sheet(title=safe)
         ws.sheet_properties.tabColor = tab_colors[idx % len(tab_colors)]
 
-        n_cols   = max(len(df.columns), 4) if not df.empty else 4
-        last_col = get_column_letter(n_cols)
-
         ws.row_dimensions[1].height = 5
         ws.row_dimensions[2].height = 28
         ws.row_dimensions[3].height = 14
+
+        raw_empty = df.empty
+        filtered_empty = False
+        if not df.empty:
+            # ── Drop indices / ETFs — keep real stocks only ────────────────
+            df = filter_stocks_only(df)
+            filtered_empty = df.empty
+            if not df.empty:
+                # ── Liquidity Rush 10d/20d + %ofMCAP — merged in from the
+                # pre-pass above (no extra network calls here, just a dict
+                # lookup) ────────────────────────────────────────────────
+                lr_ticker_col = "Ticker" if "Ticker" in df.columns else df.columns[0]
+                df = attach_liquidity_columns(df, liquidity_metrics, ticker_col=lr_ticker_col, mcap_col="Market Cap")
+
+        # n_cols/last_col computed AFTER filtering + Liquidity Rush columns
+        # are added, so the header banner spans the full final width.
+        n_cols   = max(len(df.columns), 4) if not df.empty else 4
+        last_col = get_column_letter(n_cols)
 
         ws.merge_cells(f"A2:{last_col}2")
         c = ws["A2"]
@@ -383,15 +419,10 @@ def build_excel(screener_results, output_path):
         c.alignment = Alignment(horizontal="left", vertical="center")
 
         if df.empty:
-            ws["A5"].value = "⚠️  No data retrieved for this screener"
-            ws["A5"].font  = Font(name="Arial", size=11, color=C_RED)
-            continue
-
-        # ── Drop indices / ETFs — keep real stocks only ───────────────────────
-        df = filter_stocks_only(df)
-        ws["A2"].value = f"  {name.upper()}   |   {len(df)} stocks   |   {now_str}"
-        if df.empty:
-            ws["A5"].value = "⚠️  No stocks after excluding indices/ETFs"
+            msg = ("⚠️  No data retrieved for this screener" if raw_empty
+                   else "⚠️  No stocks after excluding indices/ETFs" if filtered_empty
+                   else "⚠️  No data")
+            ws["A5"].value = msg
             ws["A5"].font  = Font(name="Arial", size=11, color=C_RED)
             continue
 

@@ -38,6 +38,8 @@ import requests
 
 from chartink_screener import WEEKLY_SCREENERS, DAILY_SCREENERS, PAUSE_BETWEEN, excel_output_path, fetch_chartink, build_excel
 from quant_scorer import run_quant_analysis
+from source_selector import choose_source, SOURCE_CHARTINK, SOURCE_WATCHLIST, SOURCE_BOTH
+from watchlist_source import load_watchlists
 
 # A name counts as "confluence" when both timeframes clear this score bar
 # AND neither is flagged as untradeable on its own timeframe. Tune to taste.
@@ -99,11 +101,14 @@ def _run_screeners(session, screeners, label):
     return results
 
 
-def _scan_timeframe(session, screeners, timeframe, excel_label):
-    results = _run_screeners(session, screeners, excel_label.upper())
+def _scan_timeframe(session, screeners, timeframe, excel_label, run_chartink=True, watchlist_results=None):
+    results = _run_screeners(session, screeners, excel_label.upper()) if run_chartink else []
+    if watchlist_results:
+        results = results + watchlist_results
+
     total_rows = sum(len(df) for _, df in results)
     if not results or total_rows == 0:
-        print(f"❌ No {excel_label} Chartink results retrieved today.")
+        print(f"❌ No {excel_label} results retrieved today.")
         return None, []
 
     print(f"\n📊 Building {excel_label} Excel report...")
@@ -238,10 +243,23 @@ def send_email_report(combined_csv_path, confluence_count, total_count):
 if __name__ == "__main__":
     print("🤖 STARTING NSE WEEKLY + DAILY COMBINED QUANT SCAN...")
 
+    mode, selected_watchlists = choose_source()
+    run_chartink = mode in (SOURCE_CHARTINK, SOURCE_BOTH)
+    watchlist_results = []
+    if mode in (SOURCE_WATCHLIST, SOURCE_BOTH):
+        print(f"\n📄 Loading {len(selected_watchlists)} watchlist file(s)...")
+        watchlist_results = load_watchlists(selected_watchlists)
+
     session = requests.Session()
 
-    weekly_csv, weekly_tickers = _scan_timeframe(session, WEEKLY_SCREENERS, "weekly", "Weekly")
-    daily_csv, daily_tickers = _scan_timeframe(session, DAILY_SCREENERS, "daily", "Daily")
+    weekly_csv, weekly_tickers = _scan_timeframe(
+        session, WEEKLY_SCREENERS, "weekly", "Weekly",
+        run_chartink=run_chartink, watchlist_results=watchlist_results,
+    )
+    daily_csv, daily_tickers = _scan_timeframe(
+        session, DAILY_SCREENERS, "daily", "Daily",
+        run_chartink=run_chartink, watchlist_results=watchlist_results,
+    )
 
     if not weekly_csv and not daily_csv:
         print("❌ No results on either timeframe today. Pipeline halted.")

@@ -24,6 +24,8 @@ import requests
 
 from chartink_screener import WEEKLY_SCREENERS, PAUSE_BETWEEN, excel_output_path, fetch_chartink, build_excel
 from quant_scorer import run_quant_analysis
+from source_selector import choose_source, SOURCE_CHARTINK, SOURCE_WATCHLIST, SOURCE_BOTH
+from watchlist_source import load_watchlists
 
 
 def send_email_report(csv_file_path):
@@ -78,17 +80,23 @@ def send_email_report(csv_file_path):
 if __name__ == "__main__":
     print("🤖 STARTING NSE WEEKLY QUANT SCAN...")
 
-    session = requests.Session()
+    mode, selected_watchlists = choose_source()
     results = []
 
-    for name, mode, value in WEEKLY_SCREENERS:
-        if mode.lower() != "clause":
-            print(f"⚠️ Skipping '{name}' — only 'clause' mode supported")
-            continue
-        print(f"\n📡 Running: {name}")
-        df = fetch_chartink(session, value)
-        results.append((name, df))
-        time.sleep(PAUSE_BETWEEN)
+    if mode in (SOURCE_CHARTINK, SOURCE_BOTH):
+        session = requests.Session()
+        for name, scmode, value in WEEKLY_SCREENERS:
+            if scmode.lower() != "clause":
+                print(f"⚠️ Skipping '{name}' — only 'clause' mode supported")
+                continue
+            print(f"\n📡 Running: {name}")
+            df = fetch_chartink(session, value)
+            results.append((name, df))
+            time.sleep(PAUSE_BETWEEN)
+
+    if mode in (SOURCE_WATCHLIST, SOURCE_BOTH):
+        print(f"\n📄 Loading {len(selected_watchlists)} watchlist file(s)...")
+        results.extend(load_watchlists(selected_watchlists))
 
     total_rows = sum(len(df) for _, df in results)
 
