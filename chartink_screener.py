@@ -397,7 +397,7 @@ def build_excel(screener_results, output_path, market="NSE"):
                 # pre-pass above (no extra network calls here, just a dict
                 # lookup) ────────────────────────────────────────────────
                 lr_ticker_col = "Ticker" if "Ticker" in df.columns else df.columns[0]
-                df = attach_liquidity_columns(df, liquidity_metrics, ticker_col=lr_ticker_col, mcap_col="Market Cap")
+                df = attach_liquidity_columns(df, liquidity_metrics, ticker_col=lr_ticker_col, mcap_col="Market Cap", market=market)
 
         # n_cols/last_col computed AFTER filtering + Liquidity Rush columns
         # are added, so the header banner spans the full final width.

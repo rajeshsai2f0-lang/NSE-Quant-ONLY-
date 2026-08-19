@@ -11,11 +11,11 @@
 ║    - Ticker column can be named Ticker / Symbol / NSE Code / NSECODE /  ║
 ║      Stock / Scrip (case-insensitive); if none of those exist, the      ║
 ║      FIRST column is used.                                              ║
-║    - An optional Market Cap column (in ₹ Cr) is carried through so      ║
-║      %ofMCAP10days / %ofMCAP20days can be computed without an extra     ║
-║      yfinance lookup. If it's missing, those two columns are simply     ║
-║      left blank for that ticker in the output Excel — liquidity_rush.py ║
-║      does not currently fetch market cap on its own.                    ║
+║    - An optional Market Cap column (in ₹ Cr) is carried through and     ║
+║      used for %ofMCAP10days / %ofMCAP20days if present — saving an      ║
+║      extra yfinance lookup. If it's missing, liquidity_rush.py now      ║
+║      fetches it from yfinance automatically and fills the Market Cap    ║
+║      column in the output Excel for you.                                ║
 ║  Every other column in the sheet is ignored.                            ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 """
