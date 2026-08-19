@@ -53,6 +53,11 @@ SCREENERS = [
         "( {cash} (  weekly close >  weekly ema( weekly close , 10 ) and  weekly ema( weekly close , 10 ) >  weekly ema( weekly close , 30 ) and  weekly ema( weekly close , 30 ) >  1 week ago weekly ema( weekly close , 30 ) and  daily high >=  weekly max( 10 , weekly high ) *  0.98 and  daily close <=  weekly ema( weekly close , 10 ) *  1.15 and  daily volume >  daily sma( daily volume , 20 ) *  1.3 and  daily close *  daily sma( daily volume , 20 ) >  5000000 and  market cap >  300 and  daily close >  10 ) )"
     ),
     (
+        "Combined Winners",
+        "clause",
+"( {cash} ( ( {cash} ( ( {cash} (  daily close /  22 days ago close >  1.2 and  market cap >  1 and  daily close *  daily sma(  daily volume , 20 ) >  30000000 and  daily close >  daily sma(  daily close , 200 ) ) ) or( {cash} (  daily close /  66 days ago close >=  1.3 and  market cap >  0 and  daily close >=  1 and  daily close *  daily sma(  daily volume , 20 ) >  30000000 and  daily close >  daily sma(  daily close , 200 ) ) ) ) ) or( {cash} (  market cap >=  1000 and  daily close >  1 day ago max( 252 ,  daily high ) *  0.75 and  daily close >  daily sma(  daily close , 50 ) and  daily close >  daily sma(  daily close , 200 ) and  daily close *  daily sma(  daily volume , 20 ) >  30000000 ) ) ) )"
+)
+    (
         "Weekly 10-30 EMA Basing - Forming",
         "clause",
         "( {cash} (  weekly close >  weekly ema( weekly close , 10 ) and  weekly ema( weekly close , 10 ) >  weekly ema( weekly close , 30 ) *  0.98 and  weekly close >=  weekly max( 10 , weekly high ) *  0.85 and  weekly close <  weekly max( 10 , weekly high ) *  0.99 and  daily close *  daily sma( daily volume , 20 ) >  5000000 and  market cap >  300 and  daily close >  10 ) )"
