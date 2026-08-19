@@ -2,4 +2,5 @@ requests
 beautifulsoup4
 openpyxl
 pandas
-yfinance
+yfinance>=0.2.66
+curl_cffi
