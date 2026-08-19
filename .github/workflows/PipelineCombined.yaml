@@ -1,6 +1,20 @@
 name: Daily NSE Weekly + Daily Combined Quant Scan
 on:
   workflow_dispatch:
+    inputs:
+      source_mode:
+        description: "Ticker source"
+        required: false
+        default: "chartink"
+        type: choice
+        options:
+          - chartink
+          - watchlist
+          - both
+      watchlist_files:
+        description: "Comma-separated filenames from watchlists/ (blank = use all found there)"
+        required: false
+        default: ""
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
@@ -19,6 +33,8 @@ jobs:
         env:
           SMTP_EMAIL: ${{ secrets.SMTP_EMAIL }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SOURCE_MODE: ${{ inputs.source_mode }}
+          WATCHLIST_FILES: ${{ inputs.watchlist_files }}
         run: python main_combined.py
       - name: Upload results CSVs
         if: always()
