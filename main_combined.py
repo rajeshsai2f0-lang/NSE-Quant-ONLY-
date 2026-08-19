@@ -45,10 +45,38 @@ CONFLUENCE_SCORE_MIN = 60
 
 # Weekly keeps its original Stage/EMA_Alignment schema (score_ticker() in
 # quant_scorer.py). Daily now uses the vision-prompt-aligned schema
-# (score_ticker_daily_vision()) — different column names, so each side
-# needs its own keep-list and its own "don't count this as confluence" set.
+# (score_ticker_daily_vision()) — different column names (id column is
+# "File" not "Symbol", "Score" is a percentage string like "65%" not a
+# bare number), so each side needs its own keep-list and its own "don't
+# count this as confluence" set. DAILY_KEEP_COLS references "Symbol"
+# because build_combined_report() renames Daily's "File" -> "Symbol"
+# right after reading the CSV, before this keep-list is applied.
+#
+# DAILY_KEEP_COLS carries every daily criteria column (all of
+# DAILY_FIELDNAMES except Timeframe/RawResponse, which are redundant here)
+# so the combined output shows the full daily read, not a trimmed subset —
+# same fields you'd see in the standalone daily CSV.
 WEEKLY_KEEP_COLS = ["Symbol", "Stage", "BreakoutStatus", "BaseStructure", "PivotPrice", "StopLevel", "Target1", "Score"]
-DAILY_KEEP_COLS = ["Symbol", "Readiness", "Pattern", "MA_Status", "Linearity", "PivotPrice", "StopLevel", "Score"]
+DAILY_KEEP_COLS = [
+    "Symbol", "Linearity", "MA_Status", "Pattern", "BaseDepth", "DistributionCheck",
+    "InstitutionalFootprint", "Readiness", "DaysToReady", "PivotPrice", "StopLevel",
+    "StoplossPercent", "Score", "Reason",
+]
+
+
+def _pct_to_num(val):
+    """'65%' -> 65.0, 'N/A'/blank/NaN -> NaN. Daily's Score column is a
+    percentage string to match the reference daily CSV format; this
+    converts it back to a number for confluence math."""
+    if pd.isna(val):
+        return float("nan")
+    s = str(val).strip()
+    if s in ("", "N/A", "nan"):
+        return float("nan")
+    try:
+        return float(s.replace("%", ""))
+    except (ValueError, TypeError):
+        return float("nan")
 
 WEEKLY_NO_SETUP_STATUSES = {"No Setup / Downtrend"}
 # Daily has no single "no setup" status — Broken means the pattern failed,
@@ -94,10 +122,20 @@ def build_combined_report(weekly_csv, daily_csv):
     if df_w.empty and df_d.empty:
         return None
 
+    # Daily's id column is "File" (matches the reference daily CSV format);
+    # rename to "Symbol" so it merges with weekly on the same key.
+    if not df_d.empty and "File" in df_d.columns:
+        df_d = df_d.rename(columns={"File": "Symbol"})
+
     df_w = df_w[[c for c in WEEKLY_KEEP_COLS if c in df_w.columns]].add_prefix("Weekly_")
     df_d = df_d[[c for c in DAILY_KEEP_COLS if c in df_d.columns]].add_prefix("Daily_")
     df_w = df_w.rename(columns={"Weekly_Symbol": "Symbol"})
     df_d = df_d.rename(columns={"Daily_Symbol": "Symbol"})
+
+    # Daily_Score arrives as a percentage string ("65%") — convert to a
+    # number so the confluence math below (and CombinedScore) works.
+    if "Daily_Score" in df_d.columns:
+        df_d["Daily_Score"] = df_d["Daily_Score"].apply(_pct_to_num)
 
     combined = pd.merge(df_w, df_d, on="Symbol", how="outer")
 
@@ -117,6 +155,14 @@ def build_combined_report(weekly_csv, daily_csv):
     combined["CombinedScore"] = combined.apply(combined_score, axis=1)
     combined["Confluence"] = combined.apply(is_confluence, axis=1)
     combined = combined.sort_values(["Confluence", "CombinedScore"], ascending=[False, False])
+
+    # Display Daily_Score back as a percentage string ("65%") to match the
+    # daily CSV's own convention — it was numeric above only so the
+    # confluence/CombinedScore math could run on it.
+    if "Daily_Score" in combined.columns:
+        combined["Daily_Score"] = combined["Daily_Score"].apply(
+            lambda v: f"{v:.0f}%" if pd.notna(v) else "N/A"
+        )
     return combined
 
 
@@ -146,9 +192,24 @@ def send_email_report(combined_csv_path, confluence_count, total_count):
         "confirmed weekly uptrend, not a counter-trend bounce.\n\n"
         "Column guide:\n"
         "  - Weekly_* : Stage, BreakoutStatus, BaseStructure, PivotPrice, StopLevel, Target1, Score "
-        "(Weinstein-stage scorer)\n"
-        "  - Daily_* : Readiness, Pattern, MA_Status, Linearity, PivotPrice, StopLevel, Score "
-        "(vision-PROMPT-aligned scorer - Ready Now / Forming / Extended / Broken)\n"
+        "(Weinstein-stage scorer, Score as a plain number)\n"
+        "  - Daily_* : Linearity, MA_Status, Pattern, BaseDepth, DistributionCheck, "
+        "InstitutionalFootprint, Readiness, DaysToReady, PivotPrice, StopLevel, StoplossPercent, "
+        "Score, Reason (vision-PROMPT-aligned scorer, same fields as the standalone daily CSV, "
+        "matched to the same ticker/id column, 'Score' written as a percentage e.g. '65%'):\n"
+        "      • Linearity: Linear / Choppy price action in the run-up into the current base\n"
+        "      • MA_Status: price vs. the 9/20/50 EMA trio - Rising (Price > 9,20,50) / "
+        "Price > 9 & 20, but < 50 / Coiling / Downtrending\n"
+        "      • Pattern: base/pattern type at the right edge of the chart (VCP, Flag, Bull Flag, "
+        "Cup with Handle, Flat Base, Long Base, Wedge, Ascending Triangle, Double Bottom, "
+        "Rounding Base, No Clear Base, ...)\n"
+        "      • BaseDepth: Shallow (< 20%) / Normal (20-35%) / Deep (> 35%)\n"
+        "      • DistributionCheck: Clean / Heavy Distribution (down-days on above-average volume "
+        "in the base)\n"
+        "      • InstitutionalFootprint: Strong / Moderate / Weak / Unclear - how many of the "
+        "run-up-into-base criteria are visible\n"
+        "      • Readiness: Ready Now / Forming / Extended / Broken\n"
+        "      • DaysToReady: only set when Readiness = Forming\n"
         "  - CombinedScore: average of Weekly_Score and Daily_Score (whichever are present)\n"
         "  - Confluence: True if the name clears the bar on both timeframes at once\n\n"
         "A blank Weekly_* or Daily_* set of columns means that ticker only showed up in one "

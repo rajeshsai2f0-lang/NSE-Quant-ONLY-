@@ -108,14 +108,17 @@ FIELDNAMES = [
     "Score", "Reason",
 ]
 
-# Daily output schema — matches the Gemini-vision PROMPT's own 15-field
-# pipe-delimited response format (see the parent project's vision_engine.py)
-# minus Symbol/Timeframe bookkeeping duplicates, so a daily CSV row here
-# reads like a row from that pipeline's output CSV.
+# Daily output schema — matches the Gemini-vision PROMPT's own 16-field
+# CSV format (see the parent project's vision_engine.py /
+# tomorrow_setups_analyzed_results_<date>.csv): "File" (not "Symbol") as
+# the ticker/id column, "Score" written out as a percentage string
+# ("40%"), and a trailing "RawResponse" column holding the same verdicts
+# pipe-delimited — the quant equivalent of that pipeline's saved raw LLM
+# response text, kept for parity with any downstream tooling that reads it.
 DAILY_FIELDNAMES = [
-    "Symbol", "Timeframe", "Linearity", "MA_Status", "Pattern", "BaseDepth",
+    "File", "Timeframe", "Linearity", "MA_Status", "Pattern", "BaseDepth",
     "DistributionCheck", "InstitutionalFootprint", "Readiness", "DaysToReady",
-    "PivotPrice", "StopLevel", "StoplossPercent", "Score", "Reason",
+    "PivotPrice", "StopLevel", "StoplossPercent", "Score", "Reason", "RawResponse",
 ]
 
 # Composite score weights — each bucket contributes independently, capped at 100.
@@ -584,15 +587,21 @@ def score_ticker_daily_vision(symbol, data, cfg):
         ma_status = _classify_ma_status_vision(close, data["EMA9"], data["EMA20"], data["EMA50"], cfg)
         readiness = "Extended" if ma_status == "Rising (Price > 9, 20, 50)" else "Forming"
         days_to_ready = "5-10 days" if readiness == "Forming" else "N/A"
+        score = _score_vision("Unclear", ma_status, "Unclear", readiness, "N/A", "N/A")
+        reason = (f"MA: {ma_status.lower()}; no qualifying base/pullback found in the last "
+                  f"{cfg['max_base']}{cfg['unit']}.")
+        raw_response = " | ".join([
+            "N/A", cfg["label"], "Unclear", ma_status, "No Clear Base", "N/A", "N/A",
+            "Unclear", readiness, days_to_ready, "N/A", "N/A", "N/A",
+            f"Score {score}%", reason,
+        ])
         return {
-            "Symbol": symbol, "Timeframe": cfg["label"], "Linearity": "Unclear",
+            "File": symbol, "Timeframe": cfg["label"], "Linearity": "Unclear",
             "MA_Status": ma_status, "Pattern": "No Clear Base", "BaseDepth": "N/A",
             "DistributionCheck": "N/A", "InstitutionalFootprint": "Unclear",
             "Readiness": readiness, "DaysToReady": days_to_ready,
             "PivotPrice": "N/A", "StopLevel": "N/A", "StoplossPercent": "N/A",
-            "Score": _score_vision("Unclear", ma_status, "Unclear", readiness, "N/A", "N/A"),
-            "Reason": f"MA: {ma_status.lower()}; no qualifying base/pullback found in the last "
-                      f"{cfg['max_base']}{cfg['unit']}.",
+            "Score": f"{score}%", "Reason": reason, "RawResponse": raw_response,
         }
 
     start_idx, base_high, base_low = base
@@ -627,10 +636,12 @@ def score_ticker_daily_vision(symbol, data, cfg):
 
     if readiness in ("Ready Now", "Forming"):
         pivot_out, stop_out, stoploss_out = pivot, stop_level, f"{stoploss_pct}%"
+        pivot_raw, stop_raw, stoploss_raw = f"{pivot:.2f}", f"{stop_level:.2f}", f"{stoploss_pct}%"
     else:
         # PROMPT Steps 11-13: pivot/stop only apply "if Ready Now (or close
         # to it)" — Extended/Broken names have no valid entry trigger.
         pivot_out, stop_out, stoploss_out = "N/A", "N/A", "N/A"
+        pivot_raw, stop_raw, stoploss_raw = "N/A", "N/A", "N/A"
 
     score = _score_vision(linearity, ma_status, footprint, readiness, base_depth, distribution)
 
@@ -640,12 +651,18 @@ def score_ticker_daily_vision(symbol, data, cfg):
         f"({footprint_detail}); readiness: {readiness.lower()}."
     )
 
+    raw_response = " | ".join([
+        "N/A", cfg["label"], linearity, ma_status, pattern, base_depth, distribution,
+        footprint, readiness, days_to_ready, pivot_raw, stop_raw, stoploss_raw,
+        f"Score {score}%", reason,
+    ])
+
     return {
-        "Symbol": symbol, "Timeframe": cfg["label"], "Linearity": linearity, "MA_Status": ma_status,
+        "File": symbol, "Timeframe": cfg["label"], "Linearity": linearity, "MA_Status": ma_status,
         "Pattern": pattern, "BaseDepth": base_depth, "DistributionCheck": distribution,
         "InstitutionalFootprint": footprint, "Readiness": readiness, "DaysToReady": days_to_ready,
         "PivotPrice": pivot_out, "StopLevel": stop_out, "StoplossPercent": stoploss_out,
-        "Score": score, "Reason": reason,
+        "Score": f"{score}%", "Reason": reason, "RawResponse": raw_response,
     }
 
 
@@ -740,12 +757,13 @@ def run_quant_analysis(tickers, timeframe="weekly", csv_filename=None):
 
     tickers = sorted(set(t.strip().upper() for t in tickers if t and str(t).strip()))
 
+    id_col = fieldnames[0]   # "Symbol" for weekly, "File" for daily
     processed = set()
     file_exists = os.path.exists(csv_filename)
     if file_exists:
         with open(csv_filename, "r", encoding="utf-8") as f:
             for row in csv.DictReader(f):
-                processed.add(row["Symbol"])
+                processed.add(row[id_col])
 
     remaining = [t for t in tickers if t.split(".")[0].strip().upper() not in processed]
     print(f"[{cfg['label']}] Total tickers: {len(tickers)} | Left to score: {len(remaining)}")
@@ -766,7 +784,7 @@ def run_quant_analysis(tickers, timeframe="weekly", csv_filename=None):
                 if timeframe == "daily":
                     row = score_ticker_daily_vision(symbol, data, cfg)
                     rows.append(row)
-                    print(f"[{cfg['label']} {n}/{len(remaining)}] {row['Symbol']}: {row['MA_Status']} | "
+                    print(f"[{cfg['label']} {n}/{len(remaining)}] {row['File']}: {row['MA_Status']} | "
                           f"{row['Readiness']} | Pattern: {row['Pattern']} | Score: {row['Score']}")
                 else:
                     row = score_ticker(symbol, data, timeframe)
