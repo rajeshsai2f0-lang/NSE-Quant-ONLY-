@@ -45,5 +45,6 @@ jobs:
             nse_setups_weekly_results_*.csv
             nse_setups_daily_results_*.csv
             nse_setups_combined_results_*.csv
+            Chartink_Screener_*.xlsx
           retention-days: 30
           if-no-files-found: warn
