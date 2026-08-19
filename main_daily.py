@@ -28,7 +28,7 @@ from source_selector import choose_source, SOURCE_CHARTINK, SOURCE_WATCHLIST, SO
 from watchlist_source import load_watchlists
 
 
-def send_email_report(csv_file_path):
+def send_email_report(csv_file_path, excel_file_path=None):
     print("📧 Preparing to send email report...")
 
     sender_email = os.getenv("SMTP_EMAIL")
@@ -84,6 +84,21 @@ def send_email_report(csv_file_path):
     else:
         msg.set_content("⚠️ Pipeline ran, but no scoring CSV output was found.")
 
+    # The scored CSV has no Liquidity Rush / Market Cap columns — those only
+    # exist in the Excel workbook build_excel() produces. Attach it too, or
+    # those columns never leave the (ephemeral) runner.
+    if excel_file_path and os.path.exists(excel_file_path):
+        with open(excel_file_path, 'rb') as f:
+            excel_data = f.read()
+            msg.add_attachment(
+                excel_data,
+                maintype='application',
+                subtype='vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                filename=os.path.basename(excel_file_path),
+            )
+    else:
+        print("⚠️ Excel workbook not found — Liquidity Rush/Market Cap columns won't be in this email.")
+
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
             smtp.login(sender_email, sender_password)
@@ -118,11 +133,12 @@ if __name__ == "__main__":
 
     if results and total_rows > 0:
         print(f"\n📊 Building Excel report...")
-        unique_tickers = build_excel(results, excel_output_path("Daily"))
+        output_excel = excel_output_path("Daily")
+        unique_tickers = build_excel(results, output_excel)
 
         print(f"\n📐 Scoring {len(unique_tickers)} tickers (no images, no LLM)...")
         output_csv = run_quant_analysis(unique_tickers, timeframe="daily")
 
-        send_email_report(output_csv)
+        send_email_report(output_csv, output_excel)
     else:
         print("❌ No Chartink results retrieved today (0 tickers across all screeners). Pipeline halted.")

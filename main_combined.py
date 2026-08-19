@@ -109,14 +109,15 @@ def _scan_timeframe(session, screeners, timeframe, excel_label, run_chartink=Tru
     total_rows = sum(len(df) for _, df in results)
     if not results or total_rows == 0:
         print(f"❌ No {excel_label} results retrieved today.")
-        return None, []
+        return None, [], None
 
     print(f"\n📊 Building {excel_label} Excel report...")
-    unique_tickers = build_excel(results, excel_output_path(excel_label))
+    excel_path = excel_output_path(excel_label)
+    unique_tickers = build_excel(results, excel_path)
 
     print(f"\n📐 Scoring {len(unique_tickers)} {excel_label.lower()} tickers (no images, no LLM)...")
     csv_path = run_quant_analysis(unique_tickers, timeframe=timeframe)
-    return csv_path, unique_tickers
+    return csv_path, unique_tickers, excel_path
 
 
 def build_combined_report(weekly_csv, daily_csv):
@@ -171,7 +172,7 @@ def build_combined_report(weekly_csv, daily_csv):
     return combined
 
 
-def send_email_report(combined_csv_path, confluence_count, total_count):
+def send_email_report(combined_csv_path, confluence_count, total_count, excel_paths=None):
     print("📧 Preparing to send email report...")
 
     sender_email = os.getenv("SMTP_EMAIL")
@@ -231,6 +232,22 @@ def send_email_report(combined_csv_path, confluence_count, total_count):
     else:
         msg.set_content("⚠️ Pipeline ran, but no combined CSV output was found.")
 
+    # The combined CSV has no Liquidity Rush / Market Cap columns — those
+    # only exist in the per-timeframe Excel workbooks build_excel() makes.
+    # Attach both, or those columns never leave the (ephemeral) runner.
+    for excel_path in (excel_paths or []):
+        if excel_path and os.path.exists(excel_path):
+            with open(excel_path, 'rb') as f:
+                excel_data = f.read()
+                msg.add_attachment(
+                    excel_data,
+                    maintype='application',
+                    subtype='vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    filename=os.path.basename(excel_path),
+                )
+        else:
+            print(f"⚠️ Excel workbook not found: {excel_path} — its Liquidity Rush/Market Cap columns won't be in this email.")
+
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
             smtp.login(sender_email, sender_password)
@@ -252,11 +269,11 @@ if __name__ == "__main__":
 
     session = requests.Session()
 
-    weekly_csv, weekly_tickers = _scan_timeframe(
+    weekly_csv, weekly_tickers, weekly_excel = _scan_timeframe(
         session, WEEKLY_SCREENERS, "weekly", "Weekly",
         run_chartink=run_chartink, watchlist_results=watchlist_results,
     )
-    daily_csv, daily_tickers = _scan_timeframe(
+    daily_csv, daily_tickers, daily_excel = _scan_timeframe(
         session, DAILY_SCREENERS, "daily", "Daily",
         run_chartink=run_chartink, watchlist_results=watchlist_results,
     )
@@ -281,4 +298,5 @@ if __name__ == "__main__":
             total_count = len(combined)
             print(f"🎯 {confluence_count}/{total_count} tickers show weekly+daily confluence")
 
-            send_email_report(combined_csv, confluence_count, total_count)
+            send_email_report(combined_csv, confluence_count, total_count,
+                               excel_paths=[weekly_excel, daily_excel])
