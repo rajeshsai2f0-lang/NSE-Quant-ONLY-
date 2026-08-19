@@ -1,26 +1,26 @@
 """
 ╔══════════════════════════════════════════════════════════════════════════╗
-║   LIQUIDITY RUSH — VWAP × Average Volume, over trailing 10d / 20d        ║
+║  LIQUIDITY RUSH — VWAP × Average Volume, over trailing 10d / 20d         ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║  LiquidityRush_Nd = avg(VWAP, last N trading days) * avg(Volume, last N  ║
-║                     trading days)                                       ║
-║  %ofMCAP_Nd       = LiquidityRush_Nd / MarketCap * 100                  ║
+║                     trading days)                                        ║
+║  %ofMCAP_Nd       = LiquidityRush_Nd / MarketCap * 100                   ║
 ║                                                                          ║
-║  yfinance only gives daily OHLCV (no intraday tick data), so "VWAP" per ║
-║  day is approximated with the typical price (High + Low + Close) / 3 —  ║
-║  the standard stand-in used when true intraday VWAP isn't available.    ║
+║  yfinance only gives daily OHLCV (no intraday tick data), so "VWAP" per  ║
+║  day is approximated with the typical price (High + Low + Close) / 3 —   ║
+║  the standard stand-in used when true intraday VWAP isn't available.     ║
 ║                                                                          ║
-║  Units:                                                                 ║
-║    NSE stocks -> LiquidityRush expressed in ₹ Crores  (raw / 1e7)       ║
-║    US  stocks -> LiquidityRush expressed in $ Millions (raw / 1e6)      ║
+║  Units:                                                                  ║
+║    NSE stocks -> LiquidityRush expressed in ₹ Crores  (raw / 1e7)        ║
+║    US  stocks -> LiquidityRush expressed in $ Millions (raw / 1e6)       ║
 ║                                                                          ║
-║  %ofMCAP assumes the Market Cap value handed in is ALREADY in that same ║
-║  unit. Market Cap can come from three places, in priority order:       ║
-║    1. Chartink's own "Market Cap" column (₹ Cr for NSE) if present.     ║
-║    2. A "Market Cap" column supplied in a watchlist Excel file.         ║
-║    3. yfinance's fast_info.market_cap, fetched here automatically for   ║
-║       any ticker missing #1/#2, converted from raw currency into the   ║
-║       same unit (Cr / M) before use.                                   ║
+║  %ofMCAP assumes the Market Cap value handed in is ALREADY in that same  ║
+║  unit. Market Cap can come from three places, in priority order:         ║
+║    1. Chartink's own "Market Cap" column (₹ Cr for NSE) if present.      ║
+║    2. A "Market Cap" column supplied in a watchlist Excel file.          ║
+║    3. yfinance's fast_info.market_cap, fetched here automatically for    ║
+║       any ticker missing #1/#2, converted from raw currency into the     ║
+║       same unit (Cr / M) before use.                                     ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 """
 
@@ -33,9 +33,9 @@ MAX_WORKERS = 8
 PERIODS = (10, 20)
 HISTORY_PERIOD = "3mo"      # comfortably covers 20 trading days + holidays
 HISTORY_INTERVAL = "1d"     # always DAILY bars — "last 10/20 days" means
-                             # trading days, regardless of whether the
-                             # caller's own pipeline is running weekly or
-                             # daily scoring.
+                            # trading days, regardless of whether the
+                            # caller's own pipeline is running weekly or
+                            # daily scoring.
 
 UNIT_DIVISOR = {"NSE": 1e7, "US": 1e6}     # ₹ Crores vs $ Millions
 UNIT_LABEL = {"NSE": "Cr", "US": "M"}
@@ -66,7 +66,7 @@ def _fetch_one(ticker, yf_suffix, min_bars):
 
     if data is None or data.empty or len(data) < min_bars:
         reason = data_err or ("no rows returned" if data is None or data.empty
-                               else f"only {len(data)} of {min_bars} required bars")
+                            else f"only {len(data)} of {min_bars} required bars")
         return ticker, None, mcap, reason
 
     if isinstance(data.columns, pd.MultiIndex):
@@ -102,8 +102,8 @@ def fetch_liquidity_rush(tickers, market="NSE", yf_suffix=None):
     yf_suffix: override the suffix yfinance needs (defaults per `market`).
 
     Returns {TICKER: {10: liquidity_rush_10d_or_None,
-                       20: liquidity_rush_20d_or_None,
-                       "market_cap": raw_market_cap_or_None}}
+                      20: liquidity_rush_20d_or_None,
+                      "market_cap": raw_market_cap_or_None}}
     market_cap is in RAW currency units (not Cr/M) — attach_liquidity_columns
     converts it to the display unit before using it.
     """
@@ -143,7 +143,7 @@ def fetch_liquidity_rush(tickers, market="NSE", yf_suffix=None):
                     fail_examples.append(f"{ticker} (exception: {e})")
 
     fail_count = len(tickers) - ok_count
-    print(f"   \U0001f4a7  Liquidity Rush: {ok_count}/{len(tickers)} ticker(s) had usable yfinance history"
+    print(f"   💧  Liquidity Rush: {ok_count}/{len(tickers)} ticker(s) had usable yfinance history"
           f"{'' if fail_count == 0 else f', {fail_count} returned no/insufficient data'}")
     if fail_examples:
         print(f"       e.g. {', '.join(fail_examples)}"
@@ -210,7 +210,7 @@ def attach_liquidity_columns(df, liquidity_metrics, ticker_col="Ticker", mcap_co
     df["%ofMCAP20days"] = pct20
 
     if online_mcap_used:
-        print(f"   \U0001f310  Market Cap: filled in from yfinance for {online_mcap_used}/{len(df)} row(s) "
+        print(f"   🌐  Market Cap: filled in from yfinance for {online_mcap_used}/{len(df)} row(s) "
               f"in this sheet (no Market Cap supplied by the source)")
 
     return df
