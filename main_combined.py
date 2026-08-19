@@ -40,9 +40,21 @@ from chartink_screener import WEEKLY_SCREENERS, DAILY_SCREENERS, PAUSE_BETWEEN, 
 from quant_scorer import run_quant_analysis
 
 # A name counts as "confluence" when both timeframes clear this score bar
-# AND neither is flagged No Setup/Downtrend. Tune to taste.
+# AND neither is flagged as untradeable on its own timeframe. Tune to taste.
 CONFLUENCE_SCORE_MIN = 60
-NO_SETUP_STATUSES = {"No Setup / Downtrend"}
+
+# Weekly keeps its original Stage/EMA_Alignment schema (score_ticker() in
+# quant_scorer.py). Daily now uses the vision-prompt-aligned schema
+# (score_ticker_daily_vision()) — different column names, so each side
+# needs its own keep-list and its own "don't count this as confluence" set.
+WEEKLY_KEEP_COLS = ["Symbol", "Stage", "BreakoutStatus", "BaseStructure", "PivotPrice", "StopLevel", "Target1", "Score"]
+DAILY_KEEP_COLS = ["Symbol", "Readiness", "Pattern", "MA_Status", "Linearity", "PivotPrice", "StopLevel", "Score"]
+
+WEEKLY_NO_SETUP_STATUSES = {"No Setup / Downtrend"}
+# Daily has no single "no setup" status — Broken means the pattern failed,
+# Extended means there's no low-risk entry left to chase. Neither is a
+# valid confluence leg even if its Score happens to clear the bar.
+DAILY_NO_SETUP_STATUSES = {"Broken", "Extended"}
 
 
 def _run_screeners(session, screeners, label):
@@ -82,10 +94,8 @@ def build_combined_report(weekly_csv, daily_csv):
     if df_w.empty and df_d.empty:
         return None
 
-    keep_cols = ["Symbol", "Stage", "BreakoutStatus", "BaseStructure",
-                 "PivotPrice", "StopLevel", "Target1", "Score"]
-    df_w = df_w[[c for c in keep_cols if c in df_w.columns]].add_prefix("Weekly_")
-    df_d = df_d[[c for c in keep_cols if c in df_d.columns]].add_prefix("Daily_")
+    df_w = df_w[[c for c in WEEKLY_KEEP_COLS if c in df_w.columns]].add_prefix("Weekly_")
+    df_d = df_d[[c for c in DAILY_KEEP_COLS if c in df_d.columns]].add_prefix("Daily_")
     df_w = df_w.rename(columns={"Weekly_Symbol": "Symbol"})
     df_d = df_d.rename(columns={"Daily_Symbol": "Symbol"})
 
@@ -97,10 +107,10 @@ def build_combined_report(weekly_csv, daily_csv):
 
     def is_confluence(row):
         ws, ds = row.get("Weekly_Score"), row.get("Daily_Score")
-        w_status, d_status = row.get("Weekly_BreakoutStatus"), row.get("Daily_BreakoutStatus")
+        w_status, d_status = row.get("Weekly_BreakoutStatus"), row.get("Daily_Readiness")
         if pd.isna(ws) or pd.isna(ds):
             return False
-        if w_status in NO_SETUP_STATUSES or d_status in NO_SETUP_STATUSES:
+        if w_status in WEEKLY_NO_SETUP_STATUSES or d_status in DAILY_NO_SETUP_STATUSES:
             return False
         return ws >= CONFLUENCE_SCORE_MIN and ds >= CONFLUENCE_SCORE_MIN
 
@@ -135,8 +145,10 @@ def send_email_report(combined_csv_path, confluence_count, total_count):
         "an actual trigger today) — confluence means the daily setup is happening inside a "
         "confirmed weekly uptrend, not a counter-trend bounce.\n\n"
         "Column guide:\n"
-        "  - Weekly_* / Daily_* : that timeframe's Stage, BreakoutStatus, base, pivot/stop/"
-        "target, and Score, computed independently\n"
+        "  - Weekly_* : Stage, BreakoutStatus, BaseStructure, PivotPrice, StopLevel, Target1, Score "
+        "(Weinstein-stage scorer)\n"
+        "  - Daily_* : Readiness, Pattern, MA_Status, Linearity, PivotPrice, StopLevel, Score "
+        "(vision-PROMPT-aligned scorer - Ready Now / Forming / Extended / Broken)\n"
         "  - CombinedScore: average of Weekly_Score and Daily_Score (whichever are present)\n"
         "  - Confluence: True if the name clears the bar on both timeframes at once\n\n"
         "A blank Weekly_* or Daily_* set of columns means that ticker only showed up in one "

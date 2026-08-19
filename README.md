@@ -50,11 +50,37 @@ All three share the same two building blocks:
      at the top of the file).
 
    The weekly and daily configs (`TIMEFRAMES` dict at the top of the file)
-   use the same 10/30 EMA rule set, just scaled for the timeframe: daily
-   uses a smaller pullback threshold (6% vs 8%), a longer max base window
-   in bar-count (40 bars vs 26), and longer slope/trend-high lookbacks (to
-   avoid single-bar noise whipsawing the Stage read the way a raw 4-day
-   lookback would).
+   use the same 10/30 EMA rule set for base/pullback detection, just scaled
+   for the timeframe: daily uses a smaller pullback threshold (6% vs 8%), a
+   longer max base window in bar-count (40 bars vs 26), and longer
+   slope/trend-high lookbacks (to avoid single-bar noise whipsawing the
+   Stage read the way a raw 4-day lookback would).
+
+   **Daily scoring is special-cased.** `run_quant_analysis(timeframe="daily")`
+   calls a separate function, `score_ticker_daily_vision()`, instead of the
+   generic Stage/EMA_Alignment scorer above. Its output schema and logic are
+   built to mirror, field-for-field, the swing-trader vision PROMPT this
+   project's Gemini-vision sibling pipeline sends per chart image — just
+   computed straight from daily OHLCV instead of asking a vision model to
+   read a rendered chart:
+
+   | Daily CSV column | PROMPT step it mirrors |
+   |---|---|
+   | `Linearity` | Step 3 — Linear/Choppy price action into the base, via an efficiency-ratio (net move ÷ path length) on the advance leg |
+   | `MA_Status` | Step 4 — price vs. the 9/20/50 EMA trio (not the 10/30 pair used for base detection) |
+   | `Pattern` | Step 5 — mapped onto the same fixed pattern list (VCP, Flag, Bull Flag, Cup with Handle, Flat Base, Long Base, Wedge, Ascending Triangle, Double Bottom, Rounding Base, No Clear Base, ...) |
+   | `BaseDepth` | Step 6 — Shallow (< 20%) / Normal (20-35%) / Deep (> 35%) |
+   | `DistributionCheck` | Step 7 — Clean / Heavy Distribution, from down-days on above-average volume inside the base |
+   | `InstitutionalFootprint` | Step 8 — Strong/Moderate/Weak, scored against the same 5 criteria (days, % advance, single-day spike, volume spike, shallow follow-through base) |
+   | `Readiness` | Step 9 — Ready Now / Forming / Extended / Broken |
+   | `DaysToReady` | Step 10 — only populated when `Readiness` = Forming |
+   | `PivotPrice` / `StopLevel` / `StoplossPercent` | Steps 11-13 — only populated when `Readiness` is Ready Now or Forming |
+   | `Score` | Step 14 — explicit weighted sum over the above (`VISION_SCORE_WEIGHTS`), not the weekly `SCORE_WEIGHTS` |
+   | `Reason` | Step 15 — one-sentence summary of volume behavior, MA relationship, and structural tightness/linearity |
+
+   Weekly's CSV schema (`Stage`, `EMA_Alignment`, `BaseStructure`, ...) is
+   unchanged. `main_combined.py`'s outer-join and Confluence check know
+   about both schemas — see below.
 
 ## Setup
 
@@ -81,8 +107,10 @@ columns side by side, plus:
   (whichever are present; a ticker that only showed up on one timeframe's
   screener just uses that one score).
 - **Confluence** — `True` only when a ticker clears `CONFLUENCE_SCORE_MIN`
-  (default 60) on **both** timeframes at once, and neither is flagged
-  `No Setup / Downtrend`.
+  (default 60) on **both** timeframes at once, and neither timeframe flags
+  it untradeable on its own terms: weekly's `BreakoutStatus` must not be
+  `No Setup / Downtrend`, and daily's `Readiness` must not be `Broken` (the
+  pattern failed) or `Extended` (already moved too far to chase).
 
 The reasoning: weekly gives you trend context (is this a real Stage 2
 advance), daily gives you entry timing (is there an actual trigger today).
