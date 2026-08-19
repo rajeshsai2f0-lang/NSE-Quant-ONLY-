@@ -397,7 +397,18 @@ def build_excel(screener_results, output_path, market="NSE"):
                 # pre-pass above (no extra network calls here, just a dict
                 # lookup) ────────────────────────────────────────────────
                 lr_ticker_col = "Ticker" if "Ticker" in df.columns else df.columns[0]
-                df = attach_liquidity_columns(df, liquidity_metrics, ticker_col=lr_ticker_col, mcap_col="Market Cap", market=market)
+                before_cols = set(df.columns)
+                try:
+                    df = attach_liquidity_columns(df, liquidity_metrics, ticker_col=lr_ticker_col, mcap_col="Market Cap", market=market)
+                except Exception as e:
+                    import traceback
+                    print(f"   ❌  Liquidity Rush merge FAILED for sheet '{name}': {e}")
+                    traceback.print_exc()
+                    # Fall through with the un-merged df rather than losing the whole sheet.
+                added_cols = set(df.columns) - before_cols
+                if not added_cols:
+                    print(f"   ⚠️  Sheet '{name}': no LiquidityRush/%ofMCAP columns were added "
+                          f"(ticker_col used: '{lr_ticker_col}')")
 
         # n_cols/last_col computed AFTER filtering + Liquidity Rush columns
         # are added, so the header banner spans the full final width.
