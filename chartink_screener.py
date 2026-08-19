@@ -56,7 +56,7 @@ SCREENERS = [
         "Combined Winners",
         "clause",
 "( {cash} ( ( {cash} ( ( {cash} (  daily close /  22 days ago close >  1.2 and  market cap >  1 and  daily close *  daily sma(  daily volume , 20 ) >  30000000 and  daily close >  daily sma(  daily close , 200 ) ) ) or( {cash} (  daily close /  66 days ago close >=  1.3 and  market cap >  0 and  daily close >=  1 and  daily close *  daily sma(  daily volume , 20 ) >  30000000 and  daily close >  daily sma(  daily close , 200 ) ) ) ) ) or( {cash} (  market cap >=  1000 and  daily close >  1 day ago max( 252 ,  daily high ) *  0.75 and  daily close >  daily sma(  daily close , 50 ) and  daily close >  daily sma(  daily close , 200 ) and  daily close *  daily sma(  daily volume , 20 ) >  30000000 ) ) ) )"
-)
+),
     (
         "Weekly 10-30 EMA Basing - Forming",
         "clause",
