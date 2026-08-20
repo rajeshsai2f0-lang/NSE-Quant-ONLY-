@@ -40,6 +40,8 @@ from chartink_screener import WEEKLY_SCREENERS, DAILY_SCREENERS, PAUSE_BETWEEN, 
 from quant_scorer import run_quant_analysis
 from source_selector import choose_source, SOURCE_CHARTINK, SOURCE_WATCHLIST, SOURCE_BOTH
 from watchlist_source import load_watchlists
+from liquidity_merge import build_liquidity_lookup, merge_liquidity, write_merged_excel, merged_output_path
+from relative_strength import fetch_relative_strength, attach_relative_strength_columns
 
 # A name counts as "confluence" when both timeframes clear this score bar
 # AND neither is flagged as untradeable on its own timeframe. Tune to taste.
@@ -172,7 +174,7 @@ def build_combined_report(weekly_csv, daily_csv):
     return combined
 
 
-def send_email_report(combined_csv_path, confluence_count, total_count, excel_paths=None):
+def send_email_report(combined_csv_path, confluence_count, total_count, excel_paths=None, merged_excel_path=None):
     print("📧 Preparing to send email report...")
 
     sender_email = os.getenv("SMTP_EMAIL")
@@ -248,6 +250,20 @@ def send_email_report(combined_csv_path, confluence_count, total_count, excel_pa
         else:
             print(f"⚠️ Excel workbook not found: {excel_path} — its Liquidity Rush/Market Cap columns won't be in this email.")
 
+    # The combined-scores + Liquidity Rush/%ofMCAP workbook — same data as
+    # combined_csv_path + the two Chartink workbooks above, just joined
+    # into one sheet so you don't have to cross-reference three files by
+    # hand.
+    if merged_excel_path and os.path.exists(merged_excel_path):
+        with open(merged_excel_path, 'rb') as f:
+            merged_data = f.read()
+            msg.add_attachment(
+                merged_data,
+                maintype='application',
+                subtype='vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                filename=os.path.basename(merged_excel_path),
+            )
+
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
             smtp.login(sender_email, sender_password)
@@ -298,5 +314,24 @@ if __name__ == "__main__":
             total_count = len(combined)
             print(f"🎯 {confluence_count}/{total_count} tickers show weekly+daily confluence")
 
+            # Combine the outputs above into a new file — Liquidity Rush
+            # and %ofMCAP (10d + 20d) copied over from BOTH the weekly and
+            # daily Chartink Excels and joined onto the combined results by
+            # Symbol. combined_csv, weekly_excel, and daily_excel are only
+            # read here, never modified.
+            print("\n🔗 Merging Liquidity Rush / %ofMCAP into combined results...")
+            liquidity_lookup = build_liquidity_lookup([weekly_excel, daily_excel])
+            merged_df = merge_liquidity(combined, liquidity_lookup, id_col="Symbol")
+
+            print("📈 Computing Relative Strength vs NIFTY50 / SMALLCAP100...")
+            all_tickers = sorted(set(weekly_tickers) | set(daily_tickers))
+            rs_metrics = fetch_relative_strength(all_tickers, market="NSE")
+            merged_df = attach_relative_strength_columns(merged_df, rs_metrics, ticker_col="Symbol")
+
+            merged_excel = merged_output_path("combined", os.path.dirname(os.path.abspath(__file__)))
+            write_merged_excel(merged_df, merged_excel, "NSE Combined Quant + Liquidity Rush")
+            print(f"✅ Combined file saved: {merged_excel}")
+
             send_email_report(combined_csv, confluence_count, total_count,
-                               excel_paths=[weekly_excel, daily_excel])
+                               excel_paths=[weekly_excel, daily_excel],
+                               merged_excel_path=merged_excel)

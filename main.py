@@ -20,15 +20,18 @@ import smtplib
 from email.message import EmailMessage
 import datetime
 
+import pandas as pd
 import requests
 
 from chartink_screener import WEEKLY_SCREENERS, PAUSE_BETWEEN, excel_output_path, fetch_chartink, build_excel
 from quant_scorer import run_quant_analysis
 from source_selector import choose_source, SOURCE_CHARTINK, SOURCE_WATCHLIST, SOURCE_BOTH
 from watchlist_source import load_watchlists
+from liquidity_merge import build_liquidity_lookup, merge_liquidity, write_merged_excel, merged_output_path
+from relative_strength import fetch_relative_strength, attach_relative_strength_columns
 
 
-def send_email_report(csv_file_path, excel_file_path=None):
+def send_email_report(csv_file_path, excel_file_path=None, merged_excel_path=None):
     print("📧 Preparing to send email report...")
 
     sender_email = os.getenv("SMTP_EMAIL")
@@ -83,6 +86,19 @@ def send_email_report(csv_file_path, excel_file_path=None):
     else:
         print("⚠️ Excel workbook not found — Liquidity Rush/Market Cap columns won't be in this email.")
 
+    # The combined weekly-scores + Liquidity Rush/%ofMCAP workbook — same
+    # data as csv_file_path + excel_file_path, just joined into one sheet
+    # so you don't have to cross-reference two files by hand.
+    if merged_excel_path and os.path.exists(merged_excel_path):
+        with open(merged_excel_path, 'rb') as f:
+            merged_data = f.read()
+            msg.add_attachment(
+                merged_data,
+                maintype='application',
+                subtype='vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                filename=os.path.basename(merged_excel_path),
+            )
+
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
             smtp.login(sender_email, sender_password)
@@ -123,6 +139,23 @@ if __name__ == "__main__":
         print(f"\n📐 Scoring {len(unique_tickers)} tickers (no images, no LLM)...")
         output_csv = run_quant_analysis(unique_tickers, timeframe="weekly")
 
-        send_email_report(output_csv, output_excel)
+        # Combine the two outputs above into a new file — Liquidity Rush
+        # and %ofMCAP (10d + 20d) copied over from the Chartink Excel and
+        # joined onto the scored results by Symbol. output_csv and
+        # output_excel themselves are only read here, never modified.
+        print("\n🔗 Merging Liquidity Rush / %ofMCAP into weekly results...")
+        liquidity_lookup = build_liquidity_lookup([output_excel])
+        weekly_df = pd.read_csv(output_csv)
+        merged_df = merge_liquidity(weekly_df, liquidity_lookup, id_col="Symbol")
+
+        print("📈 Computing Relative Strength vs NIFTY50 / SMALLCAP100...")
+        rs_metrics = fetch_relative_strength(unique_tickers, market="NSE")
+        merged_df = attach_relative_strength_columns(merged_df, rs_metrics, ticker_col="Symbol")
+
+        merged_excel = merged_output_path("weekly", os.path.dirname(os.path.abspath(__file__)))
+        write_merged_excel(merged_df, merged_excel, "NSE Weekly Quant + Liquidity Rush")
+        print(f"✅ Combined file saved: {merged_excel}")
+
+        send_email_report(output_csv, output_excel, merged_excel)
     else:
         print("❌ No Chartink results retrieved today (0 tickers across all screeners). Pipeline halted.")
