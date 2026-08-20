@@ -43,6 +43,7 @@ jobs:
           name: nse-daily-quant-results-${{ github.run_number }}
           path: |
             nse_setups_daily_results_*.csv
+            nse_setups_daily_with_liquidity_*.xlsx
             Chartink_Screener_*.xlsx
           retention-days: 30
           if-no-files-found: warn
