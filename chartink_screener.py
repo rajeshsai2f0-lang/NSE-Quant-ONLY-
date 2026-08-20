@@ -29,6 +29,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 from liquidity_rush import fetch_liquidity_rush, attach_liquidity_columns
+from price_history import fetch_price_history
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  ✏️  YOUR SCREENERS
@@ -52,182 +53,11 @@ SCREENERS = [
         "clause",
         "( {cash} (  weekly close >  weekly ema( weekly close , 10 ) and  weekly ema( weekly close , 10 ) >  weekly ema( weekly close , 30 ) and  weekly ema( weekly close , 30 ) >  1 week ago weekly ema( weekly close , 30 ) and  daily high >=  weekly max( 10 , weekly high ) *  0.98 and  daily close <=  weekly ema( weekly close , 10 ) *  1.15 and  daily volume >  daily sma( daily volume , 20 ) *  1.3 and  daily close *  daily sma( daily volume , 20 ) >  5000000 and  market cap >  300 and  daily close >  10 ) )"
     ),
-     (
-        "My Clause Screener 1",
-        "clause",
-        "( {cash} not( 18 months ago close > 0 ) )"
-    ),
     (
         "Combined Winners",
         "clause",
-        "( {cash} ( ( {cash} ( ( {cash} (  daily close /  22 days ago close >  1.2 and  market cap >  1 and  daily close *  daily sma(  daily volume , 20 ) >  30000000 and  daily close >  daily sma(  daily close , 200 ) ) ) or( {cash} (  daily close /  66 days ago close >=  1.3 and  market cap >  0 and  daily close >=  1 and  daily close *  daily sma(  daily volume , 20 ) >  30000000 and  daily close >  daily sma(  daily close , 200 ) ) ) ) ) or( {cash} (  market cap >=  1000 and  daily close >  1 day ago max( 252 ,  daily high ) *  0.75 and  daily close >  daily sma(  daily close , 50 ) and  daily close >  daily sma(  daily close , 200 ) and  daily close *  daily sma(  daily volume , 20 ) >  30000000 ) ) ) )"
-    ),
-    (
-        "25 Percent 52 Week",
-        "clause",
-        "( {cash} (  daily close >=  30 and  daily close >=  daily ema(  daily close , 50 ) and  market cap >=  1000 ) )"
-    ),
-    (
-        "Stocks Within 25pct 52wk High",
-        "clause",
-        "( {cash} (  daily close >=  30 and  daily close >=  daily ema(  daily close , 50 ) and  daily ema(  daily volume , 50 ) *  daily close >=  50000000 and  market cap >=  1 ) )"
-    ),
-    (
-        "Top Gainers",
-        "clause",
-        '( {cash} ( ( {cash} (  daily close >  20 and  daily "close - 1 candle ago close / 1 candle ago close * 100" >=  4 and(  quarterly total number -  (  quarterly total foreign promoter and group number +  quarterly indian promoter and group number ) /  10000000 *  daily close ) >=  150 ) ) ) )'
-    ),
-    (
-        "CopyATR",
-        "clause",
-        "( {cash} (  daily avg true range( 14 ) <  10 days ago avg true range( 14 ) and  daily avg true range( 14 ) /  daily close <  0.08 and  daily close >  (  weekly max( 52 ,  weekly close ) *  0.75 ) and  daily ema(  daily close , 50 ) >  daily ema(  daily close , 150 ) and  daily ema(  daily close , 150 ) >  daily ema(  daily close , 200 ) and  daily close >  daily ema(  daily close , 50 ) and  daily close >  10 and  daily close *  daily volume >  1000000 ) )"
-    ),
-    # ── NEW SCREENERS ────────────────────────────────────────────────────────
-    (
-        "Golden Cross Over",
-        "clause",
-        "( {cash} (  daily ema( close,50 ) >  daily ema( close,200 ) and  1 day ago  ema( close,50 )<=  1 day ago  ema( close,200 ) ) )"
-    ),
-    (
-        "Volume Shockers",
-        "clause",
-        "( {57960} (  daily volume >  daily sma( volume,10 ) *  2 and( {cash} (  daily close >  1 day ago close *  1.05 or  daily close <  1 day ago close *  0.95 ) ) ) )"
-    ),
-    (
-        "Capital Gainers",
-        "clause",
-        "( {cash} (  daily volume >  daily sma(  daily volume , 20 ) and  daily close >  daily upper bollinger band( 20 , 2 ) and  weekly close >  weekly upper bollinger band( 20 , 2 ) and  monthly close >  monthly upper bollinger band( 20 , 2 ) and  daily rsi( 14 ) >  60 and  weekly rsi( 14 ) >  60 and  monthly rsi( 14 ) >  60 and  monthly wma(  monthly close , 30 ) >  monthly wma(  monthly close , 50 ) and  1 month ago  wma(  monthly close , 30 )<=  1 month ago  wma(  monthly close , 50 ) and  monthly wma(  monthly close , 30 ) >  60 and  monthly wma(  monthly close , 50 ) >  60 ) )"
-    ),
-    (
-        "RSI Strong",
-        "clause",
-        "( {cash} (  daily volume >  daily sma(  daily volume , 20 ) and  daily rsi( 14 ) >  60 and  weekly rsi( 14 ) >  60 and  monthly rsi( 14 ) >  60 and  daily close >  300 and  market cap >  1000 ) )"
-    ),
-    (
-        "Manas Arora VCP",
-        "clause",
-        "( {cash} (  daily close >=  weekly max( 52 ,  weekly high ) *  0.75 and  daily close >=  weekly max( 52 ,  weekly low ) *  1 and  daily close >=  30 and  market cap <=  30000 and  daily close >  daily sma( close,200 ) and  daily close >  daily sma( close,50 ) and  daily sma( close,50 ) >  daily sma( close,200 ) and  daily close <=  3000 ) )"
-    ),
-    (
-        "BIG Breakout Scan",
-        "clause",
-        "( {cash} ( ( {cash} ( ( {cash} ( ( {cash} ( ( {cash} (  daily close /  50 days ago open <  1.58 and  daily close /  60 days ago open <  1.65 and  daily close /  40 days ago open <  1.4 and  daily close /  30 days ago open <  1.4 and  daily high /  20 days ago open <  1.4 and  daily high /  21 days ago low <  1.4 and  daily high /  22 days ago low <  1.4 and  daily high /  23 days ago low <  1.4 and  daily high /  24 days ago low <  1.4 and  daily close /  25 days ago low <  1.4 and  daily high /  26 days ago low <  1.4 and  daily high /  27 days ago low <  1.4 and  daily high /  28 days ago low <  1.4 and  daily high /  29 days ago low <  1.4 and  daily high /  30 days ago low <  1.4 and  daily close /  20 days ago open <  1.4 and  daily close /  10 days ago open <  1.4 and  daily close /  10 days ago close <  1.35 and  daily high /  13 days ago open <  40 and  daily high /  14 days ago open <  40 and  daily high /  15 days ago open <  40 and  daily high /  16 days ago open <  40 and  daily close /  4 days ago low <  1.21 and  daily high /  4 days ago open <  1.21 and  daily high /  4 days ago close <  1.21 and  daily high /  5 days ago open <  1.23 and  daily high /  5 days ago close <  1.23 and  daily high /  2 days ago close <  1.25 and  daily high /  1 day ago close <  1.20 and  daily high /  1 day ago low <  1.20 and  daily close >  1 day ago high *  0.997 and  daily close <  7000 and( {cash} (  daily volume >=  daily sma( volume,20 ) *  0.95 and( {cash} (  daily volume >=  daily sma( volume,20 ) *  2.8 or  1 day ago volume >=  1 day ago sma( volume,20 ) *  0.8 or  2 days ago volume >=  2 days ago sma( volume,20 ) *  0.8 or  3 days ago volume >=  3 days ago sma( volume,20 ) *  0.8 or  4 days ago volume >=  4 days ago sma( volume,20 ) *  1 ) ) ) ) and  daily close >  daily ema(  daily close , 10 ) and  daily close >  weekly ema(  weekly close , 40 ) and  daily close >  daily ema(  daily close , 450 ) and  daily close >  daily sma(  daily close , 50 ) and  daily high <  daily sma(  daily close , 50 ) *  1.27 and  market cap >  400 and  market cap <  300000 and( {cash} (  1 day ago high <  1 day ago sma(  daily close , 50 ) *  1.15 or  2 days ago high <  2 days ago sma(  daily close , 50 ) *  1.15 or  3 days ago high <  3 days ago sma(  daily close , 50 ) *  1.15 or  4 days ago high <  4 days ago sma(  daily close , 50 ) *  1.15 or  5 days ago high <  5 days ago sma(  daily close , 50 ) *  1.15 or  6 days ago high <  6 days ago sma(  daily close , 50 ) *  1.15 or  7 days ago high <  7 days ago sma(  daily close , 50 ) *  1.15 or  8 days ago high <  8 days ago sma(  daily close , 50 ) *  1.15 or  9 days ago high <  9 days ago sma(  daily close , 50 ) *  1.15 or  10 days ago high <  10 days ago sma(  daily close , 50 ) *  1.15 or  11 days ago high <  11 days ago sma(  daily close , 50 ) *  1.15 or  12 days ago high <  12 days ago sma(  daily close , 50 ) *  1.15 or  13 days ago high <  13 days ago sma(  daily close , 50 ) *  1.15 or  14 days ago high <  14 days ago sma(  daily close , 50 ) *  1.15 or  15 days ago high <  14 days ago sma(  daily close , 50 ) *  1.15 or  16 days ago high <  14 days ago sma(  daily close , 50 ) *  1.15 ) ) ) ) and( {cash} (  daily close >=  (  daily high -  daily open *  0.52 ) +  daily open or  daily close >=  (  daily high -  daily low *  0.52 ) +  daily low ) ) and  daily \"close - 1 candle ago close / 1 candle ago close * 100\" >=  1 and  weekly ema(  weekly close , 10 ) >  weekly ema(  weekly close , 40 ) and  daily \"close - 1 candle ago close / 1 candle ago close * 100\" <  12 and  1 day ago \"close - 1 candle ago close / 1 candle ago close * 100\" <  4.5 and  1 day ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -2 and  2 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" <  7 and  2 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -4 and  3 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" <  7 and  3 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -7 and  4 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" <  10 and  5 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" <  10 and  6 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" <  10 and  7 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" <  12 and  1 day ago low >=  2 days ago low *  .95 and  1 day ago close >=  2 days ago low *  .968 and  daily high /  daily low <  1.15 and  2 days ago high /  2 days ago low <  1.1 and  1 day ago high /  1 day ago low <  1.1 and( {cash} (  daily low <  daily ema(  daily close , 10 ) or  1 day ago low <  1 day ago ema(  daily close , 10 ) or  2 days ago low <  2 days ago ema(  daily close , 10 ) or  3 days ago low <  3 days ago ema(  daily close , 10 ) or  4 days ago low <  4 days ago ema(  daily close , 10 ) or  5 days ago low <  5 days ago ema(  daily close , 10 ) or  6 days ago low <  6 days ago ema(  daily close , 10 ) or  6 days ago low <  6 days ago sma(  daily close , 50 ) or  7 days ago low <  7 days ago sma(  daily close , 50 ) or  7 days ago low <  7 days ago ema(  daily close , 10 ) ) ) and( {cash} not(  2 days ago close <  2 days ago high *  .96 and  daily close <  2 days ago high ) ) ) ) and( {cash} not(  1 day ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  2.5 and  2 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  2.5 and  1 day ago high >  2 days ago high and  2 days ago low <  1 day ago low ) ) and( {cash} not(  3 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -5 and  daily close <  3 days ago high ) ) ) ) and( {cash} ( ( {cash} (  15 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  14 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  13 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  12 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  11 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  10 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  9 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  8 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  7 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  6 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  5 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -7 and  2 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -7 and  4 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -7 ) ) or( {cash} (  daily high >  1 day ago max( 10 ,  daily high ) *  0.96 or  daily high >  1 day ago max( 15 ,  daily high ) *  0.96 ) ) ) ) and( {cash} not(  daily high /  daily low >  1.07 and  daily close >  daily sma(  daily close , 50 ) and  1 day ago  close <=  1 day ago  sma(  daily close , 50 ) ) ) and  daily close *  daily volume >  10000000 and  1 day ago close <  1 day ago ema(  daily close , 10 ) *  1.16 and( {cash} not(  1 day ago close >  1 day ago ema(  daily close , 10 ) and  2 days ago close >  2 days ago ema(  daily close , 10 ) and  3 days ago close >  3 days ago ema(  daily close , 10 ) and  4 days ago close >  4 days ago ema(  daily close , 10 ) and  5 days ago close >  5 days ago ema(  daily close , 10 ) and  6 days ago close >  6 days ago ema(  daily close , 10 ) and  7 days ago close >  7 days ago ema(  daily close , 10 ) and  8 days ago close >  8 days ago ema(  daily close , 10 ) and  9 days ago close >  9 days ago ema(  daily close , 10 ) and  10 days ago close >  10 days ago ema(  daily close , 10 ) and  11 days ago close >  11 days ago ema(  daily close , 10 ) and  12 days ago close >  12 days ago ema(  daily close , 10 ) and  13 days ago close >  13 days ago ema(  daily close , 10 ) and  14 days ago close >  14 days ago ema(  daily close , 10 ) and  15 days ago close >  15 days ago ema(  daily close , 10 ) and  16 days ago close >  16 days ago ema(  daily close , 10 ) ) ) ) ) ) )"
-    ),
-    (
-        "Upsurge Smart Buy",
-        "clause",
-        "( {cash} ( ( {cash} (  market cap >  10000 and  quarterly foreign institutional investors percentage >  1 quarter ago foreign institutional investors percentage and  quarterly mutual funds or uti percentage >  1 quarter ago mutual funds or uti percentage and  quarterly financial institutions or banks percentage >  1 quarter ago financial institutions or banks percentage ) ) ) )"
-    ),
-    (
-        "RSI Supertrend Momentum",
-        "clause",
-        "( {57960} (  daily close >  daily supertrend( 10 , 3 ) and  daily rsi( 14 ) >  50 and  1 day ago  rsi( 14 ) <=  50 ) )"
-    ),
-    (
-        "Darvas Breakout",
-        "clause",
-        "( {cash} (  weekly high =  weekly max( 12 ,  weekly high ) and  daily close >  1 day ago high and  1 day ago close >  2 days ago close and  2 days ago close >=  3 days ago close and  daily volume >  daily min( 3 ,  daily volume ) and  daily volume >=  100000 and  daily close >  daily ema(  daily close , 200 ) ) )"
-    ),
-    (
-        "20 Days 100Cr Turnover",
-        "clause",
-        "( {33489} (  daily close *  daily volume >=  1000000000 and  1 day ago volume *  1 day ago volume >=  1000000000 and  2 days ago close *  2 days ago volume >=  1000000000 and  3 days ago close *  3 days ago volume >=  1000000000 and  5 days ago close *  5 days ago volume >=  1000000000 and  7 days ago volume *  7 days ago close >=  1000000000 and  8 days ago close *  8 days ago volume >=  1000000000 and  9 days ago close *  9 days ago volume >=  1000000000 and  10 days ago close *  10 days ago volume >=  1000000000 and  11 days ago close *  11 days ago volume >=  1000000000 and  12 days ago close *  12 days ago volume >=  1000000000 and  13 days ago close *  13 days ago volume >=  1000000000 and  14 days ago close *  14 days ago volume >=  1000000000 and  15 days ago close *  15 days ago volume >=  1000000000 and  16 days ago close *  16 days ago volume >=  1000000000 and  18 days ago close *  18 days ago volume >=  1000000000 and  19 days ago close *  19 days ago volume >=  1000000000 and  20 days ago close *  20 days ago volume >=  1000000000 ) )"
-    ),
-    (
-        "VWAP Scan",
-        "clause",
-        "( {cash} (  daily high +  daily low +  daily close /  3 *  daily volume >  10000000 and  daily close *  daily volume >  1000000000 ) )"
-    ),
-    (
-        "Tecnofunda Fundamental",
-        "clause",
-        "( {cash} ( ( {cash} (  yearly return on capital employed percentage >  15 and  yearly return on net worth percentage >=  15 ) ) and  quarterly foreign institutional investors percentage >=  1 quarter ago foreign institutional investors percentage and  1 quarter ago foreign institutional investors percentage >=  2 quarter ago foreign institutional investors percentage and( {cash} (  yearly eps after extraordinary items diluted >  1 year ago eps after extraordinary items diluted and  1 year ago eps after extraordinary items diluted >  2 years ago eps after extraordinary items diluted and  2 years ago eps after extraordinary items diluted >  3 years ago eps after extraordinary items diluted ) ) and  market cap <  50000 and  daily volume >  50000 ) )"
-    ),
-    (
-        "MARK Trend Template",
-        "clause",
-        "( {cash} ( ( {cash} (  market cap >=  100 and  daily buyer initiated trades >=  200 and  daily seller initiated trades >=  200 and  daily close >  daily sma( close,200 ) and  daily close >  daily sma( close,50 ) and  daily close >=  weekly max( 52 ,  weekly high ) *  0.7 and  daily sma( close,50 ) >  daily sma( close,200 ) and(  quarterly total number -  (  quarterly total foreign promoter and group number +  quarterly indian promoter and group number ) /  10000000 *  daily close ) >=  150 ) ) ) )"
-    ),
-    (
-        "Quallamagie Template",
-        "clause",
-        "( {cash} ( ( {cash} (  daily close >  10 and  daily buyer initiated trades >=  200 and  daily seller initiated trades >=  200 and  market cap >=  300 and(  quarterly total number -  (  quarterly total foreign promoter and group number +  quarterly indian promoter and group number ) /  10000000 *  daily close ) >=  150 and( {cash} ( ( {cash} (  (  daily max( 63 ,  daily high ) -  daily min( 63 ,  daily low ) ) /  daily min( 63 ,  daily low ) *  100 >=  30 and  daily close >=  (  daily min( 63 ,  daily low ) +  (  daily max( 63 ,  daily high ) -  daily min( 63 ,  daily low ) *  0.5 ) ) ) ) or( {cash} (  (  daily max( 21 ,  daily high ) -  daily min( 21 ,  daily low ) ) /  daily min( 21 ,  daily low ) *  100 >=  25 and  daily close >=  (  daily min( 21 ,  daily low ) +  (  daily max( 21 ,  daily high ) -  daily min( 21 ,  daily low ) *  0.5 ) ) ) ) ) ) ) ) ) )"
-    ),
-    (
-        "3 Week Tight",
-        "clause",
-        "( {cash} ( ( {cash} (  daily close >  20 and  daily sma(  daily volume , 50 ) *  daily close >=  2000000 and  daily close >  daily ema(  daily close , 50 ) and  abs(  (  weekly max( 3 ,  weekly close ) /  weekly min( 3 ,  weekly close ) -  1 ) *  100 ) <=  3 and(  3 weeks ago max( 12 ,  weekly close ) /  3 weeks ago min( 12 ,  weekly close ) -  1 ) *  100 >=  30 and  market cap <=  40000 ) ) ) )"
-    ),
-    (
-        "Master Candle Breakout",
-        "clause",
-        "( {cash} ( ( {cash} (  daily high <=  5 days ago high and  1 day ago high <=  5 days ago high and  2 days ago high <=  5 days ago high and  3 days ago high <=  5 days ago high and  4 days ago high <=  5 days ago high and  5 days ago high >=  5 days ago low *  1.04 and  5 days ago close >=  5 days ago open and  daily low >=  5 days ago low and  1 day ago low >=  5 days ago low and  2 days ago low >=  5 days ago low and  3 days ago low >=  5 days ago low and  4 days ago low >=  5 days ago low ) ) and  market cap >=  1 and  daily close >=  daily ema(  daily close , 50 ) ) )"
-    ),
-    (
-        "Multi Bagger StockExploder",
-        "clause",
-        "( {cash} (  monthly \"close - 1 candle ago close / 1 candle ago close * 100\" >=  20 and  monthly rsi( 14 ) >=  50 and  monthly ema(  monthly close , 10 ) >=  monthly ema(  monthly close , 20 ) and  daily ema(  daily volume , 30 ) >=  50000 and  daily close >=  20 and( {cash} (  monthly count( 20, 1 where  monthly ema(  monthly close , 10 ) >  monthly ema(  monthly close , 20 ) and  1 month ago  ema(  monthly close , 10 )<=  1 month ago  ema(  monthly close , 20 ) ) >=  1 or  monthly close >  monthly ema(  monthly close , 10 ) and  1 month ago  close <=  1 month ago  ema(  monthly close , 10 ) ) ) ) )"
-    ),
-    (
-        "RB StockExploder",
-        "clause",
-        "( {cash} (  daily wma( close,1 ) >  monthly wma( close,2 ) +  1 and  monthly wma( close,2 ) >  monthly wma( close,4 ) +  2 and  daily wma( close,1 ) >  weekly wma( close,6 ) +  2 and  weekly wma( close,6 ) >  weekly wma( close,12 ) +  2 and  daily wma( close,1 ) >  4 days ago wma( close,12 ) +  2 and  daily wma( close,1 ) >  2 days ago wma( close,20 ) +  2 and  daily close >  25 and  daily close <=  500 and  weekly volume >  85000 ) )"
-    ),
-    (
-        "ATR Tight",
-        "clause",
-        "( {cash} (  daily avg true range( 14 ) <  10 days ago avg true range( 14 ) and  daily avg true range( 14 ) /  daily close <  0.08 and  daily close >  (  weekly max( 52 ,  weekly close ) *  0.75 ) and  daily ema(  daily close , 50 ) >  daily ema(  daily close , 150 ) and  daily ema(  daily close , 150 ) >  daily ema(  daily close , 200 ) and  daily close >  daily ema(  daily close , 50 ) and  daily close >  10 and  daily close *  daily volume >  1000000 ) )"
-    ),
-    (
-        "3 Days Higher High Higher Low",
-        "clause",
-        "( {cash} (  daily high >  1 day ago high and  daily low >  1 day ago low and  1 day ago high >  2 days ago high and  1 day ago low >  2 days ago low and  2 days ago high >  3 days ago high and  2 days ago low >  3 days ago low and  daily close >  daily ema( close,3 ) and  daily volume >  500000 and  daily volume >  daily sma( volume,9 ) ) )"
-    ),
-    (
-        "Momentum Stocks",
-        "clause",
-        "( {cash} (  daily close >  30 and  daily sma(  daily volume , 50 ) >=  50000 and( {cash} (  daily close >=  5 days ago low *  1.2 or  daily close >=  30 days ago low *  1.3 or  daily close >=  90 days ago low *  1.3 ) ) ) )"
-    ),
-    (
-        "Short Term Breakout",
-        "clause",
-        "( {cash} (  daily max( 5 ,  daily close ) >  6 days ago max( 120 ,  daily close ) *  1.05 and  daily volume >  daily sma( volume,5 ) and  daily close >  1 day ago close ) )"
-    ),
-    (
-        "Donchian Scanner",
-        "clause",
-        "( {57960} (  daily close >  1 day ago max( 20 ,  daily high ) or  daily close <  1 day ago min( 20 ,  daily low ) ) )"
-    ),
-    (
-        "Inside Bar Daily",
-        "clause",
-        "( {cash} (  daily high <  1 day ago high and  daily low >  1 day ago low and  daily volume >  100000 and  daily close >  100 ) )"
-    ),
-    (
-        "Kristina Quallamagie 1M 3M",
-        "clause",
-        "( {cash} ( ( {cash} (  daily close >  10 and  daily buyer initiated trades >=  200 and  daily seller initiated trades >=  200 and  market cap >=  300 and(  quarterly total number -  (  quarterly total foreign promoter and group number +  quarterly indian promoter and group number ) /  10000000 *  daily close ) >=  150 and( {cash} ( ( {cash} (  (  daily max( 63 ,  daily high ) -  daily min( 63 ,  daily low ) ) /  daily min( 63 ,  daily low ) *  100 >=  30 and  daily close >=  (  daily min( 63 ,  daily low ) +  (  daily max( 63 ,  daily high ) -  daily min( 63 ,  daily low ) *  0.5 ) ) ) ) or( {cash} (  (  daily max( 21 ,  daily high ) -  daily min( 21 ,  daily low ) ) /  daily min( 21 ,  daily low ) *  100 >=  25 and  daily close >=  (  daily min( 21 ,  daily low ) +  (  daily max( 21 ,  daily high ) -  daily min( 21 ,  daily low ) *  0.5 ) ) ) ) ) ) ) ) ) )"
-    ),
-    (
-        "Institutional Buying",
-        "clause",
-        "( {cash} (  daily close >  1 day ago min( 20 ,  daily close ) *  1.2 and  daily count( 20, 1 where  daily volume /  20 days ago sma(  daily volume , 50 ) >  2 ) >  5 and( {cash} (  daily max( 20 ,  daily volume ) >=  20 days ago max( 260 ,  21 days ago volume ) or  daily max( 20 ,  daily volume ) >=  20 days ago max( 66 ,  21 days ago volume ) or  daily max( 20 ,  daily volume ) >=  20 days ago max( 22 ,  21 days ago volume ) or  daily max( 20 ,  daily \"close - 1 candle ago close / 1 candle ago close * 100\" ) >=  8 ) ) and  market cap >  500 ) )"
-    ),
-    (
-        "52 Week Highest Close",
-        "clause",
-        "( {cash} (  daily close >=  50 and  daily ema( close,5 ) >  daily ema( close,26 ) and  daily ema( close,13 ) >  daily ema( close,26 ) and  daily close >  1 day ago close *  1.03 and  daily volume >  daily sma( volume,20 ) *  1.0 and  daily ema( close,5 ) >  daily ema( close,13 ) and  daily high =  daily max( 250 ,  daily high ) *  1 and  1 day ago close >  2 days ago close *  0.98 ) )"
-    ),
-    (
-        "Weekly Pennant",
-        "clause",
-        "( {cash} (  daily high <  1 week ago high and  1 week ago high <  2 weeks ago high and  daily low >  1 week ago low and  1 week ago low >  2 weeks ago low and  daily open <  2 weeks ago open and  daily close >  1 week ago close and  3 weeks ago close >  4 weeks ago close and  4 weeks ago close >  5 weeks ago close ) )"
-    ),
-    (
-        "Multi Year Breakout SK",
-        "clause",
-        "( {cash} (  monthly macd line( 26,12,9 ) >  0 and  monthly rsi( 14 ) >  69 and  daily close >  20 and  daily volume >  50000 and  market cap >  250 and( {cash} (  monthly macd line( 5,8,3 ) >  1 month ago max( 35 ,  monthly macd line( 5,8,3 ) ) or  monthly macd line( 13,21,8 ) >  1 month ago max( 35 ,  monthly macd line( 13,21,8 ) ) or  monthly macd line( 26,12,9 ) >  1 month ago max( 35 ,  monthly macd line( 26,12,9 ) ) ) ) ) )"
-    ),
+"( {cash} ( ( {cash} ( ( {cash} (  daily close /  22 days ago close >  1.2 and  market cap >  1 and  daily close *  daily sma(  daily volume , 20 ) >  30000000 and  daily close >  daily sma(  daily close , 200 ) ) ) or( {cash} (  daily close /  66 days ago close >=  1.3 and  market cap >  0 and  daily close >=  1 and  daily close *  daily sma(  daily volume , 20 ) >  30000000 and  daily close >  daily sma(  daily close , 200 ) ) ) ) ) or( {cash} (  market cap >=  1000 and  daily close >  1 day ago max( 252 ,  daily high ) *  0.75 and  daily close >  daily sma(  daily close , 50 ) and  daily close >  daily sma(  daily close , 200 ) and  daily close *  daily sma(  daily volume , 20 ) >  30000000 ) ) ) )"
+),
     (
         "Weekly 10-30 EMA Basing - Forming",
         "clause",
@@ -250,190 +80,14 @@ WEEKLY_SCREENERS = SCREENERS
 # ══════════════════════════════════════════════════════════════════════════════
 DAILY_SCREENERS = [
     (
-        "Weekly 10-30 EMA Breakout - Ready Now",
+        "Daily 10-30 EMA Breakout - Ready Now",
         "clause",
-        "( {cash} (  weekly close >  weekly ema( weekly close , 10 ) and  weekly ema( weekly close , 10 ) >  weekly ema( weekly close , 30 ) and  weekly ema( weekly close , 30 ) >  1 week ago weekly ema( weekly close , 30 ) and  daily high >=  weekly max( 10 , weekly high ) *  0.98 and  daily close <=  weekly ema( weekly close , 10 ) *  1.15 and  daily volume >  daily sma( daily volume , 20 ) *  1.3 and  daily close *  daily sma( daily volume , 20 ) >  5000000 and  market cap >  300 and  daily close >  10 ) )"
-    ),
-     (
-        "My Clause Screener 1",
-        "clause",
-        "( {cash} not( 18 months ago close > 0 ) )"
+        "( {cash} (  close >  ema( close , 10 ) and  ema( close , 10 ) >  ema( close , 30 ) and  ema( close , 30 ) >  1 day ago ema( close , 30 ) and  high >=  max( 10 , high ) *  0.98 and  close <=  ema( close , 10 ) *  1.15 and  volume >  sma( volume , 20 ) *  1.3 and  close *  sma( volume , 20 ) >  5000000 and  market cap >  300 and  close >  10 ) )"
     ),
     (
-        "Combined Winners",
+        "Daily 10-30 EMA Basing - Forming",
         "clause",
-        "( {cash} ( ( {cash} ( ( {cash} (  daily close /  22 days ago close >  1.2 and  market cap >  1 and  daily close *  daily sma(  daily volume , 20 ) >  30000000 and  daily close >  daily sma(  daily close , 200 ) ) ) or( {cash} (  daily close /  66 days ago close >=  1.3 and  market cap >  0 and  daily close >=  1 and  daily close *  daily sma(  daily volume , 20 ) >  30000000 and  daily close >  daily sma(  daily close , 200 ) ) ) ) ) or( {cash} (  market cap >=  1000 and  daily close >  1 day ago max( 252 ,  daily high ) *  0.75 and  daily close >  daily sma(  daily close , 50 ) and  daily close >  daily sma(  daily close , 200 ) and  daily close *  daily sma(  daily volume , 20 ) >  30000000 ) ) ) )"
-    ),
-    (
-        "25 Percent 52 Week",
-        "clause",
-        "( {cash} (  daily close >=  30 and  daily close >=  daily ema(  daily close , 50 ) and  market cap >=  1000 ) )"
-    ),
-    (
-        "Stocks Within 25pct 52wk High",
-        "clause",
-        "( {cash} (  daily close >=  30 and  daily close >=  daily ema(  daily close , 50 ) and  daily ema(  daily volume , 50 ) *  daily close >=  50000000 and  market cap >=  1 ) )"
-    ),
-    (
-        "Top Gainers",
-        "clause",
-        '( {cash} ( ( {cash} (  daily close >  20 and  daily "close - 1 candle ago close / 1 candle ago close * 100" >=  4 and(  quarterly total number -  (  quarterly total foreign promoter and group number +  quarterly indian promoter and group number ) /  10000000 *  daily close ) >=  150 ) ) ) )'
-    ),
-    (
-        "CopyATR",
-        "clause",
-        "( {cash} (  daily avg true range( 14 ) <  10 days ago avg true range( 14 ) and  daily avg true range( 14 ) /  daily close <  0.08 and  daily close >  (  weekly max( 52 ,  weekly close ) *  0.75 ) and  daily ema(  daily close , 50 ) >  daily ema(  daily close , 150 ) and  daily ema(  daily close , 150 ) >  daily ema(  daily close , 200 ) and  daily close >  daily ema(  daily close , 50 ) and  daily close >  10 and  daily close *  daily volume >  1000000 ) )"
-    ),
-    # ── NEW SCREENERS ────────────────────────────────────────────────────────
-    (
-        "Golden Cross Over",
-        "clause",
-        "( {cash} (  daily ema( close,50 ) >  daily ema( close,200 ) and  1 day ago  ema( close,50 )<=  1 day ago  ema( close,200 ) ) )"
-    ),
-    (
-        "Volume Shockers",
-        "clause",
-        "( {57960} (  daily volume >  daily sma( volume,10 ) *  2 and( {cash} (  daily close >  1 day ago close *  1.05 or  daily close <  1 day ago close *  0.95 ) ) ) )"
-    ),
-    (
-        "Capital Gainers",
-        "clause",
-        "( {cash} (  daily volume >  daily sma(  daily volume , 20 ) and  daily close >  daily upper bollinger band( 20 , 2 ) and  weekly close >  weekly upper bollinger band( 20 , 2 ) and  monthly close >  monthly upper bollinger band( 20 , 2 ) and  daily rsi( 14 ) >  60 and  weekly rsi( 14 ) >  60 and  monthly rsi( 14 ) >  60 and  monthly wma(  monthly close , 30 ) >  monthly wma(  monthly close , 50 ) and  1 month ago  wma(  monthly close , 30 )<=  1 month ago  wma(  monthly close , 50 ) and  monthly wma(  monthly close , 30 ) >  60 and  monthly wma(  monthly close , 50 ) >  60 ) )"
-    ),
-    (
-        "RSI Strong",
-        "clause",
-        "( {cash} (  daily volume >  daily sma(  daily volume , 20 ) and  daily rsi( 14 ) >  60 and  weekly rsi( 14 ) >  60 and  monthly rsi( 14 ) >  60 and  daily close >  300 and  market cap >  1000 ) )"
-    ),
-    (
-        "Manas Arora VCP",
-        "clause",
-        "( {cash} (  daily close >=  weekly max( 52 ,  weekly high ) *  0.75 and  daily close >=  weekly max( 52 ,  weekly low ) *  1 and  daily close >=  30 and  market cap <=  30000 and  daily close >  daily sma( close,200 ) and  daily close >  daily sma( close,50 ) and  daily sma( close,50 ) >  daily sma( close,200 ) and  daily close <=  3000 ) )"
-    ),
-    (
-        "BIG Breakout Scan",
-        "clause",
-        "( {cash} ( ( {cash} ( ( {cash} ( ( {cash} ( ( {cash} (  daily close /  50 days ago open <  1.58 and  daily close /  60 days ago open <  1.65 and  daily close /  40 days ago open <  1.4 and  daily close /  30 days ago open <  1.4 and  daily high /  20 days ago open <  1.4 and  daily high /  21 days ago low <  1.4 and  daily high /  22 days ago low <  1.4 and  daily high /  23 days ago low <  1.4 and  daily high /  24 days ago low <  1.4 and  daily close /  25 days ago low <  1.4 and  daily high /  26 days ago low <  1.4 and  daily high /  27 days ago low <  1.4 and  daily high /  28 days ago low <  1.4 and  daily high /  29 days ago low <  1.4 and  daily high /  30 days ago low <  1.4 and  daily close /  20 days ago open <  1.4 and  daily close /  10 days ago open <  1.4 and  daily close /  10 days ago close <  1.35 and  daily high /  13 days ago open <  40 and  daily high /  14 days ago open <  40 and  daily high /  15 days ago open <  40 and  daily high /  16 days ago open <  40 and  daily close /  4 days ago low <  1.21 and  daily high /  4 days ago open <  1.21 and  daily high /  4 days ago close <  1.21 and  daily high /  5 days ago open <  1.23 and  daily high /  5 days ago close <  1.23 and  daily high /  2 days ago close <  1.25 and  daily high /  1 day ago close <  1.20 and  daily high /  1 day ago low <  1.20 and  daily close >  1 day ago high *  0.997 and  daily close <  7000 and( {cash} (  daily volume >=  daily sma( volume,20 ) *  0.95 and( {cash} (  daily volume >=  daily sma( volume,20 ) *  2.8 or  1 day ago volume >=  1 day ago sma( volume,20 ) *  0.8 or  2 days ago volume >=  2 days ago sma( volume,20 ) *  0.8 or  3 days ago volume >=  3 days ago sma( volume,20 ) *  0.8 or  4 days ago volume >=  4 days ago sma( volume,20 ) *  1 ) ) ) ) and  daily close >  daily ema(  daily close , 10 ) and  daily close >  weekly ema(  weekly close , 40 ) and  daily close >  daily ema(  daily close , 450 ) and  daily close >  daily sma(  daily close , 50 ) and  daily high <  daily sma(  daily close , 50 ) *  1.27 and  market cap >  400 and  market cap <  300000 and( {cash} (  1 day ago high <  1 day ago sma(  daily close , 50 ) *  1.15 or  2 days ago high <  2 days ago sma(  daily close , 50 ) *  1.15 or  3 days ago high <  3 days ago sma(  daily close , 50 ) *  1.15 or  4 days ago high <  4 days ago sma(  daily close , 50 ) *  1.15 or  5 days ago high <  5 days ago sma(  daily close , 50 ) *  1.15 or  6 days ago high <  6 days ago sma(  daily close , 50 ) *  1.15 or  7 days ago high <  7 days ago sma(  daily close , 50 ) *  1.15 or  8 days ago high <  8 days ago sma(  daily close , 50 ) *  1.15 or  9 days ago high <  9 days ago sma(  daily close , 50 ) *  1.15 or  10 days ago high <  10 days ago sma(  daily close , 50 ) *  1.15 or  11 days ago high <  11 days ago sma(  daily close , 50 ) *  1.15 or  12 days ago high <  12 days ago sma(  daily close , 50 ) *  1.15 or  13 days ago high <  13 days ago sma(  daily close , 50 ) *  1.15 or  14 days ago high <  14 days ago sma(  daily close , 50 ) *  1.15 or  15 days ago high <  14 days ago sma(  daily close , 50 ) *  1.15 or  16 days ago high <  14 days ago sma(  daily close , 50 ) *  1.15 ) ) ) ) and( {cash} (  daily close >=  (  daily high -  daily open *  0.52 ) +  daily open or  daily close >=  (  daily high -  daily low *  0.52 ) +  daily low ) ) and  daily \"close - 1 candle ago close / 1 candle ago close * 100\" >=  1 and  weekly ema(  weekly close , 10 ) >  weekly ema(  weekly close , 40 ) and  daily \"close - 1 candle ago close / 1 candle ago close * 100\" <  12 and  1 day ago \"close - 1 candle ago close / 1 candle ago close * 100\" <  4.5 and  1 day ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -2 and  2 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" <  7 and  2 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -4 and  3 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" <  7 and  3 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -7 and  4 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" <  10 and  5 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" <  10 and  6 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" <  10 and  7 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" <  12 and  1 day ago low >=  2 days ago low *  .95 and  1 day ago close >=  2 days ago low *  .968 and  daily high /  daily low <  1.15 and  2 days ago high /  2 days ago low <  1.1 and  1 day ago high /  1 day ago low <  1.1 and( {cash} (  daily low <  daily ema(  daily close , 10 ) or  1 day ago low <  1 day ago ema(  daily close , 10 ) or  2 days ago low <  2 days ago ema(  daily close , 10 ) or  3 days ago low <  3 days ago ema(  daily close , 10 ) or  4 days ago low <  4 days ago ema(  daily close , 10 ) or  5 days ago low <  5 days ago ema(  daily close , 10 ) or  6 days ago low <  6 days ago ema(  daily close , 10 ) or  6 days ago low <  6 days ago sma(  daily close , 50 ) or  7 days ago low <  7 days ago sma(  daily close , 50 ) or  7 days ago low <  7 days ago ema(  daily close , 10 ) ) ) and( {cash} not(  2 days ago close <  2 days ago high *  .96 and  daily close <  2 days ago high ) ) ) ) and( {cash} not(  1 day ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  2.5 and  2 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  2.5 and  1 day ago high >  2 days ago high and  2 days ago low <  1 day ago low ) ) and( {cash} not(  3 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -5 and  daily close <  3 days ago high ) ) ) ) and( {cash} ( ( {cash} (  15 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  14 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  13 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  12 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  11 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  10 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  9 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  8 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  7 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  6 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -10 and  5 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -7 and  2 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -7 and  4 days ago \"close - 1 candle ago close / 1 candle ago close * 100\" >  -7 ) ) or( {cash} (  daily high >  1 day ago max( 10 ,  daily high ) *  0.96 or  daily high >  1 day ago max( 15 ,  daily high ) *  0.96 ) ) ) ) and( {cash} not(  daily high /  daily low >  1.07 and  daily close >  daily sma(  daily close , 50 ) and  1 day ago  close <=  1 day ago  sma(  daily close , 50 ) ) ) and  daily close *  daily volume >  10000000 and  1 day ago close <  1 day ago ema(  daily close , 10 ) *  1.16 and( {cash} not(  1 day ago close >  1 day ago ema(  daily close , 10 ) and  2 days ago close >  2 days ago ema(  daily close , 10 ) and  3 days ago close >  3 days ago ema(  daily close , 10 ) and  4 days ago close >  4 days ago ema(  daily close , 10 ) and  5 days ago close >  5 days ago ema(  daily close , 10 ) and  6 days ago close >  6 days ago ema(  daily close , 10 ) and  7 days ago close >  7 days ago ema(  daily close , 10 ) and  8 days ago close >  8 days ago ema(  daily close , 10 ) and  9 days ago close >  9 days ago ema(  daily close , 10 ) and  10 days ago close >  10 days ago ema(  daily close , 10 ) and  11 days ago close >  11 days ago ema(  daily close , 10 ) and  12 days ago close >  12 days ago ema(  daily close , 10 ) and  13 days ago close >  13 days ago ema(  daily close , 10 ) and  14 days ago close >  14 days ago ema(  daily close , 10 ) and  15 days ago close >  15 days ago ema(  daily close , 10 ) and  16 days ago close >  16 days ago ema(  daily close , 10 ) ) ) ) ) ) )"
-    ),
-    (
-        "Upsurge Smart Buy",
-        "clause",
-        "( {cash} ( ( {cash} (  market cap >  10000 and  quarterly foreign institutional investors percentage >  1 quarter ago foreign institutional investors percentage and  quarterly mutual funds or uti percentage >  1 quarter ago mutual funds or uti percentage and  quarterly financial institutions or banks percentage >  1 quarter ago financial institutions or banks percentage ) ) ) )"
-    ),
-    (
-        "RSI Supertrend Momentum",
-        "clause",
-        "( {57960} (  daily close >  daily supertrend( 10 , 3 ) and  daily rsi( 14 ) >  50 and  1 day ago  rsi( 14 ) <=  50 ) )"
-    ),
-    (
-        "Darvas Breakout",
-        "clause",
-        "( {cash} (  weekly high =  weekly max( 12 ,  weekly high ) and  daily close >  1 day ago high and  1 day ago close >  2 days ago close and  2 days ago close >=  3 days ago close and  daily volume >  daily min( 3 ,  daily volume ) and  daily volume >=  100000 and  daily close >  daily ema(  daily close , 200 ) ) )"
-    ),
-    (
-        "20 Days 100Cr Turnover",
-        "clause",
-        "( {33489} (  daily close *  daily volume >=  1000000000 and  1 day ago volume *  1 day ago volume >=  1000000000 and  2 days ago close *  2 days ago volume >=  1000000000 and  3 days ago close *  3 days ago volume >=  1000000000 and  5 days ago close *  5 days ago volume >=  1000000000 and  7 days ago volume *  7 days ago close >=  1000000000 and  8 days ago close *  8 days ago volume >=  1000000000 and  9 days ago close *  9 days ago volume >=  1000000000 and  10 days ago close *  10 days ago volume >=  1000000000 and  11 days ago close *  11 days ago volume >=  1000000000 and  12 days ago close *  12 days ago volume >=  1000000000 and  13 days ago close *  13 days ago volume >=  1000000000 and  14 days ago close *  14 days ago volume >=  1000000000 and  15 days ago close *  15 days ago volume >=  1000000000 and  16 days ago close *  16 days ago volume >=  1000000000 and  18 days ago close *  18 days ago volume >=  1000000000 and  19 days ago close *  19 days ago volume >=  1000000000 and  20 days ago close *  20 days ago volume >=  1000000000 ) )"
-    ),
-    (
-        "VWAP Scan",
-        "clause",
-        "( {cash} (  daily high +  daily low +  daily close /  3 *  daily volume >  10000000 and  daily close *  daily volume >  1000000000 ) )"
-    ),
-    (
-        "Tecnofunda Fundamental",
-        "clause",
-        "( {cash} ( ( {cash} (  yearly return on capital employed percentage >  15 and  yearly return on net worth percentage >=  15 ) ) and  quarterly foreign institutional investors percentage >=  1 quarter ago foreign institutional investors percentage and  1 quarter ago foreign institutional investors percentage >=  2 quarter ago foreign institutional investors percentage and( {cash} (  yearly eps after extraordinary items diluted >  1 year ago eps after extraordinary items diluted and  1 year ago eps after extraordinary items diluted >  2 years ago eps after extraordinary items diluted and  2 years ago eps after extraordinary items diluted >  3 years ago eps after extraordinary items diluted ) ) and  market cap <  50000 and  daily volume >  50000 ) )"
-    ),
-    (
-        "MARK Trend Template",
-        "clause",
-        "( {cash} ( ( {cash} (  market cap >=  100 and  daily buyer initiated trades >=  200 and  daily seller initiated trades >=  200 and  daily close >  daily sma( close,200 ) and  daily close >  daily sma( close,50 ) and  daily close >=  weekly max( 52 ,  weekly high ) *  0.7 and  daily sma( close,50 ) >  daily sma( close,200 ) and(  quarterly total number -  (  quarterly total foreign promoter and group number +  quarterly indian promoter and group number ) /  10000000 *  daily close ) >=  150 ) ) ) )"
-    ),
-    (
-        "Quallamagie Template",
-        "clause",
-        "( {cash} ( ( {cash} (  daily close >  10 and  daily buyer initiated trades >=  200 and  daily seller initiated trades >=  200 and  market cap >=  300 and(  quarterly total number -  (  quarterly total foreign promoter and group number +  quarterly indian promoter and group number ) /  10000000 *  daily close ) >=  150 and( {cash} ( ( {cash} (  (  daily max( 63 ,  daily high ) -  daily min( 63 ,  daily low ) ) /  daily min( 63 ,  daily low ) *  100 >=  30 and  daily close >=  (  daily min( 63 ,  daily low ) +  (  daily max( 63 ,  daily high ) -  daily min( 63 ,  daily low ) *  0.5 ) ) ) ) or( {cash} (  (  daily max( 21 ,  daily high ) -  daily min( 21 ,  daily low ) ) /  daily min( 21 ,  daily low ) *  100 >=  25 and  daily close >=  (  daily min( 21 ,  daily low ) +  (  daily max( 21 ,  daily high ) -  daily min( 21 ,  daily low ) *  0.5 ) ) ) ) ) ) ) ) ) )"
-    ),
-    (
-        "3 Week Tight",
-        "clause",
-        "( {cash} ( ( {cash} (  daily close >  20 and  daily sma(  daily volume , 50 ) *  daily close >=  2000000 and  daily close >  daily ema(  daily close , 50 ) and  abs(  (  weekly max( 3 ,  weekly close ) /  weekly min( 3 ,  weekly close ) -  1 ) *  100 ) <=  3 and(  3 weeks ago max( 12 ,  weekly close ) /  3 weeks ago min( 12 ,  weekly close ) -  1 ) *  100 >=  30 and  market cap <=  40000 ) ) ) )"
-    ),
-    (
-        "Master Candle Breakout",
-        "clause",
-        "( {cash} ( ( {cash} (  daily high <=  5 days ago high and  1 day ago high <=  5 days ago high and  2 days ago high <=  5 days ago high and  3 days ago high <=  5 days ago high and  4 days ago high <=  5 days ago high and  5 days ago high >=  5 days ago low *  1.04 and  5 days ago close >=  5 days ago open and  daily low >=  5 days ago low and  1 day ago low >=  5 days ago low and  2 days ago low >=  5 days ago low and  3 days ago low >=  5 days ago low and  4 days ago low >=  5 days ago low ) ) and  market cap >=  1 and  daily close >=  daily ema(  daily close , 50 ) ) )"
-    ),
-    (
-        "Multi Bagger StockExploder",
-        "clause",
-        "( {cash} (  monthly \"close - 1 candle ago close / 1 candle ago close * 100\" >=  20 and  monthly rsi( 14 ) >=  50 and  monthly ema(  monthly close , 10 ) >=  monthly ema(  monthly close , 20 ) and  daily ema(  daily volume , 30 ) >=  50000 and  daily close >=  20 and( {cash} (  monthly count( 20, 1 where  monthly ema(  monthly close , 10 ) >  monthly ema(  monthly close , 20 ) and  1 month ago  ema(  monthly close , 10 )<=  1 month ago  ema(  monthly close , 20 ) ) >=  1 or  monthly close >  monthly ema(  monthly close , 10 ) and  1 month ago  close <=  1 month ago  ema(  monthly close , 10 ) ) ) ) )"
-    ),
-    (
-        "RB StockExploder",
-        "clause",
-        "( {cash} (  daily wma( close,1 ) >  monthly wma( close,2 ) +  1 and  monthly wma( close,2 ) >  monthly wma( close,4 ) +  2 and  daily wma( close,1 ) >  weekly wma( close,6 ) +  2 and  weekly wma( close,6 ) >  weekly wma( close,12 ) +  2 and  daily wma( close,1 ) >  4 days ago wma( close,12 ) +  2 and  daily wma( close,1 ) >  2 days ago wma( close,20 ) +  2 and  daily close >  25 and  daily close <=  500 and  weekly volume >  85000 ) )"
-    ),
-    (
-        "ATR Tight",
-        "clause",
-        "( {cash} (  daily avg true range( 14 ) <  10 days ago avg true range( 14 ) and  daily avg true range( 14 ) /  daily close <  0.08 and  daily close >  (  weekly max( 52 ,  weekly close ) *  0.75 ) and  daily ema(  daily close , 50 ) >  daily ema(  daily close , 150 ) and  daily ema(  daily close , 150 ) >  daily ema(  daily close , 200 ) and  daily close >  daily ema(  daily close , 50 ) and  daily close >  10 and  daily close *  daily volume >  1000000 ) )"
-    ),
-    (
-        "3 Days Higher High Higher Low",
-        "clause",
-        "( {cash} (  daily high >  1 day ago high and  daily low >  1 day ago low and  1 day ago high >  2 days ago high and  1 day ago low >  2 days ago low and  2 days ago high >  3 days ago high and  2 days ago low >  3 days ago low and  daily close >  daily ema( close,3 ) and  daily volume >  500000 and  daily volume >  daily sma( volume,9 ) ) )"
-    ),
-    (
-        "Momentum Stocks",
-        "clause",
-        "( {cash} (  daily close >  30 and  daily sma(  daily volume , 50 ) >=  50000 and( {cash} (  daily close >=  5 days ago low *  1.2 or  daily close >=  30 days ago low *  1.3 or  daily close >=  90 days ago low *  1.3 ) ) ) )"
-    ),
-    (
-        "Short Term Breakout",
-        "clause",
-        "( {cash} (  daily max( 5 ,  daily close ) >  6 days ago max( 120 ,  daily close ) *  1.05 and  daily volume >  daily sma( volume,5 ) and  daily close >  1 day ago close ) )"
-    ),
-    (
-        "Donchian Scanner",
-        "clause",
-        "( {57960} (  daily close >  1 day ago max( 20 ,  daily high ) or  daily close <  1 day ago min( 20 ,  daily low ) ) )"
-    ),
-    (
-        "Inside Bar Daily",
-        "clause",
-        "( {cash} (  daily high <  1 day ago high and  daily low >  1 day ago low and  daily volume >  100000 and  daily close >  100 ) )"
-    ),
-    (
-        "Kristina Quallamagie 1M 3M",
-        "clause",
-        "( {cash} ( ( {cash} (  daily close >  10 and  daily buyer initiated trades >=  200 and  daily seller initiated trades >=  200 and  market cap >=  300 and(  quarterly total number -  (  quarterly total foreign promoter and group number +  quarterly indian promoter and group number ) /  10000000 *  daily close ) >=  150 and( {cash} ( ( {cash} (  (  daily max( 63 ,  daily high ) -  daily min( 63 ,  daily low ) ) /  daily min( 63 ,  daily low ) *  100 >=  30 and  daily close >=  (  daily min( 63 ,  daily low ) +  (  daily max( 63 ,  daily high ) -  daily min( 63 ,  daily low ) *  0.5 ) ) ) ) or( {cash} (  (  daily max( 21 ,  daily high ) -  daily min( 21 ,  daily low ) ) /  daily min( 21 ,  daily low ) *  100 >=  25 and  daily close >=  (  daily min( 21 ,  daily low ) +  (  daily max( 21 ,  daily high ) -  daily min( 21 ,  daily low ) *  0.5 ) ) ) ) ) ) ) ) ) )"
-    ),
-    (
-        "Institutional Buying",
-        "clause",
-        "( {cash} (  daily close >  1 day ago min( 20 ,  daily close ) *  1.2 and  daily count( 20, 1 where  daily volume /  20 days ago sma(  daily volume , 50 ) >  2 ) >  5 and( {cash} (  daily max( 20 ,  daily volume ) >=  20 days ago max( 260 ,  21 days ago volume ) or  daily max( 20 ,  daily volume ) >=  20 days ago max( 66 ,  21 days ago volume ) or  daily max( 20 ,  daily volume ) >=  20 days ago max( 22 ,  21 days ago volume ) or  daily max( 20 ,  daily \"close - 1 candle ago close / 1 candle ago close * 100\" ) >=  8 ) ) and  market cap >  500 ) )"
-    ),
-    (
-        "52 Week Highest Close",
-        "clause",
-        "( {cash} (  daily close >=  50 and  daily ema( close,5 ) >  daily ema( close,26 ) and  daily ema( close,13 ) >  daily ema( close,26 ) and  daily close >  1 day ago close *  1.03 and  daily volume >  daily sma( volume,20 ) *  1.0 and  daily ema( close,5 ) >  daily ema( close,13 ) and  daily high =  daily max( 250 ,  daily high ) *  1 and  1 day ago close >  2 days ago close *  0.98 ) )"
-    ),
-    (
-        "Weekly Pennant",
-        "clause",
-        "( {cash} (  daily high <  1 week ago high and  1 week ago high <  2 weeks ago high and  daily low >  1 week ago low and  1 week ago low >  2 weeks ago low and  daily open <  2 weeks ago open and  daily close >  1 week ago close and  3 weeks ago close >  4 weeks ago close and  4 weeks ago close >  5 weeks ago close ) )"
-    ),
-    (
-        "Multi Year Breakout SK",
-        "clause",
-        "( {cash} (  monthly macd line( 26,12,9 ) >  0 and  monthly rsi( 14 ) >  69 and  daily close >  20 and  daily volume >  50000 and  market cap >  250 and( {cash} (  monthly macd line( 5,8,3 ) >  1 month ago max( 35 ,  monthly macd line( 5,8,3 ) ) or  monthly macd line( 13,21,8 ) >  1 month ago max( 35 ,  monthly macd line( 13,21,8 ) ) or  monthly macd line( 26,12,9 ) >  1 month ago max( 35 ,  monthly macd line( 26,12,9 ) ) ) ) ) )"
-    ),
-    (
-        "Weekly 10-30 EMA Basing - Forming",
-        "clause",
-        "( {cash} (  weekly close >  weekly ema( weekly close , 10 ) and  weekly ema( weekly close , 10 ) >  weekly ema( weekly close , 30 ) *  0.98 and  weekly close >=  weekly max( 10 , weekly high ) *  0.85 and  weekly close <  weekly max( 10 , weekly high ) *  0.99 and  daily close *  daily sma( daily volume , 20 ) >  5000000 and  market cap >  300 and  daily close >  10 ) )"
+        "( {cash} (  close >  ema( close , 10 ) and  ema( close , 10 ) >  ema( close , 30 ) *  0.98 and  close >=  max( 10 , high ) *  0.85 and  close <  max( 10 , high ) *  0.99 and  close *  sma( volume , 20 ) >  5000000 and  market cap >  300 and  close >  10 ) )"
     ),
 ]
 
@@ -699,10 +353,18 @@ def build_excel(screener_results, output_path, market="NSE"):
         tcol = "Ticker" if "Ticker" in clean.columns else clean.columns[0]
         all_syms.update(clean[tcol].dropna().astype(str).str.strip().str.upper())
 
+    # Fetch each unique ticker's daily OHLCV ONCE here and reuse it for
+    # Liquidity Rush below. main.py/main_daily.py/main_combined.py also
+    # reuse this same dict for Relative Strength later in the run instead
+    # of downloading each ticker's history a second time — see
+    # price_history.py.
+    price_histories = {}
     liquidity_metrics = {}
     if all_syms:
+        print(f"   📡  Fetching price history ({market}) for {len(all_syms)} unique ticker(s)...")
+        price_histories = fetch_price_history(all_syms, market=market)
         print(f"   💧  Computing Liquidity Rush (10d/20d, {market}) for {len(all_syms)} unique ticker(s)...")
-        liquidity_metrics = fetch_liquidity_rush(all_syms, market=market)
+        liquidity_metrics = fetch_liquidity_rush(all_syms, market=market, price_histories=price_histories)
 
     def fill(h):
         return PatternFill("solid", fgColor=h)
@@ -942,7 +604,10 @@ def build_excel(screener_results, output_path, market="NSE"):
 
     wb.save(output_path)
     print(f"\n✅  Excel saved: {output_path}")
-    return unique
+    # price_histories is returned alongside the ticker list so callers
+    # (main.py etc.) can feed it straight into fetch_relative_strength()
+    # later in the same run instead of re-downloading.
+    return unique, price_histories
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  MAIN
@@ -979,7 +644,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print(f"\n\n📊  Building Excel...")
-    unique = build_excel(all_results, OUTPUT_FILE)
+    unique, _price_histories = build_excel(all_results, OUTPUT_FILE)
 
     print(f"\n🎯  {len(unique)} unique tickers")
     print(f"    Preview: {', '.join(unique[:12])}{'...' if len(unique) > 12 else ''}")

@@ -81,9 +81,12 @@ def _fetch_benchmark_returns(lookback_days):
     return out
 
 
-def _fetch_one(ticker, yf_suffix, lookback_days):
-    symbol = ticker + yf_suffix
-    data = _download(symbol)
+def _fetch_one(ticker, yf_suffix, lookback_days, prefetched_data=None):
+    if prefetched_data is not None:
+        data = prefetched_data
+    else:
+        symbol = ticker + yf_suffix
+        data = _download(symbol)
     return ticker, _pct_return(data, lookback_days)
 
 
@@ -100,12 +103,20 @@ def _percentile_rank_1_99(value_by_ticker):
     return scaled.to_dict()
 
 
-def fetch_relative_strength(tickers, market="NSE", yf_suffix=None, lookback_days=LOOKBACK_DAYS):
+def fetch_relative_strength(tickers, market="NSE", yf_suffix=None, lookback_days=LOOKBACK_DAYS, price_histories=None):
     """
     tickers: iterable of bare symbols (no exchange suffix — e.g. "TCS", not
              "TCS.NS").
     market:  "NSE" or "US" — controls the ticker suffix used for the
              yfinance lookup.
+    price_histories: optional {TICKER: DataFrame_or_None} from
+             price_history.fetch_price_history(). When given, this reuses
+             that data instead of downloading each ticker's price history
+             again — halves the yfinance calls this pipeline makes per
+             run, since liquidity_rush.py needs the same OHLCV. The two
+             benchmark indices (NIFTY50 / SMALLCAP100) are always fetched
+             separately here regardless, since they aren't part of the
+             ticker universe.
 
     Returns {TICKER: {"RS_vs_NIFTY50": pct_or_None, "RS_Rating_NIFTY50": int_or_None,
                        "RS_vs_SMALLCAP100": pct_or_None, "RS_Rating_SMALLCAP100": int_or_None}}
@@ -126,7 +137,13 @@ def fetch_relative_strength(tickers, market="NSE", yf_suffix=None, lookback_days
     ok_count = 0
     fail_examples = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-        futures = {pool.submit(_fetch_one, t, yf_suffix, lookback_days): t for t in tickers}
+        futures = {
+            pool.submit(
+                _fetch_one, t, yf_suffix, lookback_days,
+                (price_histories or {}).get(t),
+            ): t
+            for t in tickers
+        }
         for fut in concurrent.futures.as_completed(futures):
             ticker = futures[fut]
             try:

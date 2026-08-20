@@ -73,17 +73,23 @@ def _fetch_market_cap(symbol, yf_ticker=None):
     return None, None
 
 
-def _fetch_one(ticker, yf_suffix, min_bars):
+def _fetch_one(ticker, yf_suffix, min_bars, prefetched_data=None):
     symbol = ticker + yf_suffix
 
     # ── Price history (for LiquidityRush) ───────────────────────────────
-    try:
-        data = yf.download(symbol, period=HISTORY_PERIOD, interval=HISTORY_INTERVAL, progress=False)
-    except Exception as e:
-        data = None
-        data_err = str(e)
+    # If price_history.py already fetched this ticker for us (shared with
+    # relative_strength.py), reuse it instead of downloading again.
+    if prefetched_data is not None:
+        data = prefetched_data
+        data_err = None if data is not None else "no shared history available"
     else:
-        data_err = None
+        try:
+            data = yf.download(symbol, period=HISTORY_PERIOD, interval=HISTORY_INTERVAL, progress=False)
+        except Exception as e:
+            data = None
+            data_err = str(e)
+        else:
+            data_err = None
 
     # ── Market cap (for %ofMCAP fallback) ───────────────────────────────
     mcap, mcap_source = _fetch_market_cap(symbol)
@@ -95,7 +101,9 @@ def _fetch_one(ticker, yf_suffix, min_bars):
 
     if isinstance(data.columns, pd.MultiIndex):
         data.columns = data.columns.get_level_values(0)
-    data["Typical"] = (data["High"] + data["Low"] + data["Close"]) / 3
+    if "Typical" not in data.columns:
+        data = data.copy()
+        data["Typical"] = (data["High"] + data["Low"] + data["Close"]) / 3
     return ticker, data, mcap, mcap_source, None
 
 
@@ -116,7 +124,7 @@ def _compute_metrics(data, unit_divisor):
     return out
 
 
-def fetch_liquidity_rush(tickers, market="NSE", yf_suffix=None):
+def fetch_liquidity_rush(tickers, market="NSE", yf_suffix=None, price_histories=None):
     """
     tickers: iterable of bare symbols (no exchange suffix — e.g. "TCS", not
              "TCS.NS").
@@ -124,6 +132,13 @@ def fetch_liquidity_rush(tickers, market="NSE", yf_suffix=None):
              yfinance lookup and the unit (Cr vs M) the result is expressed
              in.
     yf_suffix: override the suffix yfinance needs (defaults per `market`).
+    price_histories: optional {TICKER: DataFrame_or_None} from
+             price_history.fetch_price_history(). When given, this reuses
+             that data instead of downloading each ticker's price history
+             again — halves the yfinance calls this pipeline makes per
+             run, since relative_strength.py needs the same OHLCV. Market
+             cap is always fetched here regardless (separate endpoint,
+             not covered by price_histories).
 
     Returns {TICKER: {10: liquidity_rush_10d_or_None,
                        20: liquidity_rush_20d_or_None,
@@ -150,7 +165,13 @@ def fetch_liquidity_rush(tickers, market="NSE", yf_suffix=None):
     mcap_fail_examples = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-        futures = {pool.submit(_fetch_one, t, yf_suffix, min_bars): t for t in tickers}
+        futures = {
+            pool.submit(
+                _fetch_one, t, yf_suffix, min_bars,
+                (price_histories or {}).get(t),
+            ): t
+            for t in tickers
+        }
         for fut in concurrent.futures.as_completed(futures):
             ticker = futures[fut]
             try:

@@ -28,6 +28,7 @@ from quant_scorer import run_quant_analysis
 from source_selector import choose_source, SOURCE_CHARTINK, SOURCE_WATCHLIST, SOURCE_BOTH
 from watchlist_source import load_watchlists
 from liquidity_merge import build_liquidity_lookup, merge_liquidity, write_merged_excel, merged_output_path
+from relative_strength import fetch_relative_strength, attach_relative_strength_columns
 
 
 def send_email_report(csv_file_path, excel_file_path=None, merged_excel_path=None):
@@ -149,7 +150,7 @@ if __name__ == "__main__":
     if results and total_rows > 0:
         print(f"\n📊 Building Excel report...")
         output_excel = excel_output_path("Daily")
-        unique_tickers = build_excel(results, output_excel)
+        unique_tickers, price_histories = build_excel(results, output_excel)
 
         print(f"\n📐 Scoring {len(unique_tickers)} tickers (no images, no LLM)...")
         output_csv = run_quant_analysis(unique_tickers, timeframe="daily")
@@ -163,6 +164,11 @@ if __name__ == "__main__":
         liquidity_lookup = build_liquidity_lookup([output_excel])
         daily_df = pd.read_csv(output_csv)
         merged_df = merge_liquidity(daily_df, liquidity_lookup, id_col="File")
+
+        print("📈 Computing Relative Strength vs NIFTY50 / SMALLCAP100...")
+        rs_metrics = fetch_relative_strength(unique_tickers, market="NSE", price_histories=price_histories)
+        merged_df = attach_relative_strength_columns(merged_df, rs_metrics, ticker_col="File")
+
         merged_excel = merged_output_path("daily", os.path.dirname(os.path.abspath(__file__)))
         write_merged_excel(merged_df, merged_excel, "NSE Daily Quant + Liquidity Rush")
         print(f"✅ Combined file saved: {merged_excel}")

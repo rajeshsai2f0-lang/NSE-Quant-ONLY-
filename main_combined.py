@@ -41,6 +41,7 @@ from quant_scorer import run_quant_analysis
 from source_selector import choose_source, SOURCE_CHARTINK, SOURCE_WATCHLIST, SOURCE_BOTH
 from watchlist_source import load_watchlists
 from liquidity_merge import build_liquidity_lookup, merge_liquidity, write_merged_excel, merged_output_path
+from relative_strength import fetch_relative_strength, attach_relative_strength_columns
 
 # A name counts as "confluence" when both timeframes clear this score bar
 # AND neither is flagged as untradeable on its own timeframe. Tune to taste.
@@ -110,15 +111,15 @@ def _scan_timeframe(session, screeners, timeframe, excel_label, run_chartink=Tru
     total_rows = sum(len(df) for _, df in results)
     if not results or total_rows == 0:
         print(f"❌ No {excel_label} results retrieved today.")
-        return None, [], None
+        return None, [], None, {}
 
     print(f"\n📊 Building {excel_label} Excel report...")
     excel_path = excel_output_path(excel_label)
-    unique_tickers = build_excel(results, excel_path)
+    unique_tickers, price_histories = build_excel(results, excel_path)
 
     print(f"\n📐 Scoring {len(unique_tickers)} {excel_label.lower()} tickers (no images, no LLM)...")
     csv_path = run_quant_analysis(unique_tickers, timeframe=timeframe)
-    return csv_path, unique_tickers, excel_path
+    return csv_path, unique_tickers, excel_path, price_histories
 
 
 def build_combined_report(weekly_csv, daily_csv):
@@ -284,14 +285,18 @@ if __name__ == "__main__":
 
     session = requests.Session()
 
-    weekly_csv, weekly_tickers, weekly_excel = _scan_timeframe(
+    weekly_csv, weekly_tickers, weekly_excel, weekly_price_histories = _scan_timeframe(
         session, WEEKLY_SCREENERS, "weekly", "Weekly",
         run_chartink=run_chartink, watchlist_results=watchlist_results,
     )
-    daily_csv, daily_tickers, daily_excel = _scan_timeframe(
+    daily_csv, daily_tickers, daily_excel, daily_price_histories = _scan_timeframe(
         session, DAILY_SCREENERS, "daily", "Daily",
         run_chartink=run_chartink, watchlist_results=watchlist_results,
     )
+    # A ticker can show up in both scans (e.g. it clears a weekly AND a
+    # daily screener) — daily_price_histories is layered on top so either
+    # copy is fine to reuse; they're the same OHLCV either way.
+    combined_price_histories = {**weekly_price_histories, **daily_price_histories}
 
     if not weekly_csv and not daily_csv:
         print("❌ No results on either timeframe today. Pipeline halted.")
@@ -321,6 +326,12 @@ if __name__ == "__main__":
             print("\n🔗 Merging Liquidity Rush / %ofMCAP into combined results...")
             liquidity_lookup = build_liquidity_lookup([weekly_excel, daily_excel])
             merged_df = merge_liquidity(combined, liquidity_lookup, id_col="Symbol")
+
+            print("📈 Computing Relative Strength vs NIFTY50 / SMALLCAP100...")
+            all_tickers = sorted(set(weekly_tickers) | set(daily_tickers))
+            rs_metrics = fetch_relative_strength(all_tickers, market="NSE", price_histories=combined_price_histories)
+            merged_df = attach_relative_strength_columns(merged_df, rs_metrics, ticker_col="Symbol")
+
             merged_excel = merged_output_path("combined", os.path.dirname(os.path.abspath(__file__)))
             write_merged_excel(merged_df, merged_excel, "NSE Combined Quant + Liquidity Rush")
             print(f"✅ Combined file saved: {merged_excel}")
