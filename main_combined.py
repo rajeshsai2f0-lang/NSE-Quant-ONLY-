@@ -41,7 +41,6 @@ from quant_scorer import run_quant_analysis
 from source_selector import choose_source, SOURCE_CHARTINK, SOURCE_WATCHLIST, SOURCE_BOTH
 from watchlist_source import load_watchlists
 from liquidity_merge import build_liquidity_lookup, merge_liquidity, write_merged_excel, merged_output_path
-from relative_strength import fetch_relative_strength, attach_relative_strength_columns
 
 # A name counts as "confluence" when both timeframes clear this score bar
 # AND neither is flagged as untradeable on its own timeframe. Tune to taste.
@@ -322,12 +321,6 @@ if __name__ == "__main__":
             print("\n🔗 Merging Liquidity Rush / %ofMCAP into combined results...")
             liquidity_lookup = build_liquidity_lookup([weekly_excel, daily_excel])
             merged_df = merge_liquidity(combined, liquidity_lookup, id_col="Symbol")
-
-            print("📈 Computing Relative Strength vs NIFTY50 / SMALLCAP100...")
-            all_tickers = sorted(set(weekly_tickers) | set(daily_tickers))
-            rs_metrics = fetch_relative_strength(all_tickers, market="NSE")
-            merged_df = attach_relative_strength_columns(merged_df, rs_metrics, ticker_col="Symbol")
-
             merged_excel = merged_output_path("combined", os.path.dirname(os.path.abspath(__file__)))
             write_merged_excel(merged_df, merged_excel, "NSE Combined Quant + Liquidity Rush")
             print(f"✅ Combined file saved: {merged_excel}")
